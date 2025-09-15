@@ -19,4 +19,8 @@ app.use("/api/recipes", recipeRoutes);
 
 const recipe_stepRoutes = require('./routes/recipe_stepRoutes');
 app.use("/api/recipe_step", recipe_stepRoutes);
+
+const recipe_imageRoutes = require('./routes/recipe_imageRoutes.js');
+app.use("/api/recipe_images", recipe_imageRoutes);
+
 module.exports = app;

@@ -10,11 +10,15 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false 
     },
     step_id: { 
-        type: DataTypes.INTEGER 
+        type: DataTypes.INTEGER
     },
     image_url: { 
         type: DataTypes.TEXT, 
         allowNull: false 
+    },
+    public_id: {
+        type: DataTypes.STRING,
+        allowNull: false
     },
     is_main: { 
         type: DataTypes.BOOLEAN, 
