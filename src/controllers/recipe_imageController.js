@@ -2,6 +2,7 @@ const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
 const { RecipeImage } = require("../models");
 
+// Lấy danh sách ảnh
 exports.getRecipeImages = async function (req, res) {
   try {
     const { recipe_id, step_id } = req.query;
@@ -15,29 +16,44 @@ exports.getRecipeImages = async function (req, res) {
       order: [["image_id", "ASC"]],
     });
 
-    res.json(images);
+    res.json({
+      success: true,
+      data: images,
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi lấy images",
+      details: err.message,
+    });
   }
 };
 
-// Thêm ảnh
+
+// Thêm ảnh mới
 exports.addRecipeImage = async function (req, res) {
   try {
     const { recipe_id, step_id, is_main } = req.body;
     const file = req.file;
 
-    if (!file) return res.status(400).json({ message: "No file uploaded" });
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        message: "Không có file upload",
+      });
+    }
 
-    // Upload lên Cloudinary
+    // Upload lên Cloudinary, ép về JPG và tối ưu chất lượng
     const result = await cloudinary.uploader.upload(file.path, {
       folder: "recipes",
+      format: "jpg", // ép thành jpg (khắc phục .heic không load)
+      transformation: [{ quality: "auto" }],
     });
 
-    // Xóa file tạm trên local
+    // Xóa file tạm local
     fs.unlink(file.path, (err) => {
-      if (err) console.error("Failed to delete local file:", err);
+      if (err) console.error("❌ Failed to delete local file:", err);
     });
 
     const newImage = await RecipeImage.create({
@@ -48,10 +64,17 @@ exports.addRecipeImage = async function (req, res) {
       is_main: is_main || false,
     });
 
-    res.status(201).json(newImage);
+    res.status(201).json({
+      success: true,
+      data: newImage,
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    console.error("❌ addRecipeImage error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi thêm image",
+      details: err.message,
+    });
   }
 };
 
@@ -63,22 +86,35 @@ exports.updateRecipeImage = async function (req, res) {
     const file = req.file;
 
     const image = await RecipeImage.findByPk(image_id);
-    if (!image) return res.status(404).json({ message: "Image not found" });
+    if (!image) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy image",
+      });
+    }
 
     let image_url = image.image_url;
     let public_id = image.public_id;
 
     if (file) {
-      await cloudinary.uploader.destroy(image.public_id);
+      // Xóa ảnh cũ trên Cloudinary
+      if (image.public_id) {
+        await cloudinary.uploader.destroy(image.public_id);
+      }
 
+      // Upload ảnh mới lên Cloudinary, ép về JPG
       const result = await cloudinary.uploader.upload(file.path, {
         folder: "recipes",
+        format: "jpg",
+        transformation: [{ quality: "auto" }],
       });
+
       image_url = result.secure_url;
       public_id = result.public_id;
 
+      // Xóa file tạm local
       fs.unlink(file.path, (err) => {
-        if (err) console.error("Failed to delete local file:", err);
+        if (err) console.error("❌ Failed to delete local file:", err);
       });
     }
 
@@ -88,10 +124,17 @@ exports.updateRecipeImage = async function (req, res) {
       is_main: is_main !== undefined ? is_main : image.is_main,
     });
 
-    res.json(image);
+    res.json({
+      success: true,
+      data: image,
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    console.error("❌ updateRecipeImage error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi cập nhật image",
+      details: err.message,
+    });
   }
 };
 
@@ -100,14 +143,27 @@ exports.deleteRecipeImage = async function (req, res) {
   try {
     const { image_id } = req.params;
     const image = await RecipeImage.findByPk(image_id);
-    if (!image) return res.status(404).json({ message: "Image not found" });
+
+    if (!image) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy image",
+      });
+    }
 
     await cloudinary.uploader.destroy(image.public_id);
     await image.destroy();
 
-    res.json({ message: "Image deleted successfully" });
+    res.json({
+      success: true,
+      message: "Xóa image thành công",
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi xóa image",
+      details: err.message,
+    });
   }
 };

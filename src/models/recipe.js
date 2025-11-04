@@ -9,9 +9,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER, 
         allowNull: false 
     },
-    category_id: { 
-        type: DataTypes.INTEGER 
-    },
     title: { 
         type: DataTypes.STRING(200), 
         allowNull: false 
@@ -32,6 +29,12 @@ module.exports = (sequelize, DataTypes) => {
     updated_at: { 
         type: DataTypes.DATE, 
         defaultValue: DataTypes.NOW 
+    },
+    image_url: { 
+        type: DataTypes.TEXT 
+    },
+    image_public_id: { 
+        type: DataTypes.TEXT 
     },
   }, {
     tableName: "recipe",

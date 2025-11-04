@@ -15,10 +15,10 @@ exports.register = async (req, res) => {
     }
 
     // Kiểm tra username tồn tại
-    const existingUsername = await User.findOne({ where: { username } });
-    if (existingUsername) {
-      return res.status(400).json({ message: "Username đã tồn tại" });
-    }
+    // const existingUsername = await User.findOne({ where: { username } });
+    // if (existingUsername) {
+    //   return res.status(400).json({ message: "Username đã tồn tại" });
+    // }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -69,7 +69,7 @@ exports.login = async (req, res) => {
     // Tạo JWT token
     const token = jwt.sign(
       { user_id: user.user_id, role: user.role },
-      process.env.JWT_SECRET || "secret_key",
+      process.env.JWT_SECRET ,
       { expiresIn: "1h" }
     );
 

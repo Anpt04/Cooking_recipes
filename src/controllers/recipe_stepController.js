@@ -1,80 +1,169 @@
-const { RecipeStep, Recipe, RecipeImage } = require("../models");
+const { RecipeStep, Recipe, RecipeImage} = require("../models");
 
-// Lấy tất cả bước của 1 công thức
+// 📘 Lấy tất cả bước của 1 công thức
 exports.getAllSteps = async (req, res) => {
   try {
     const { recipeId } = req.params;
+
     const steps = await RecipeStep.findAll({
       where: { recipe_id: recipeId },
+      include: [
+        {
+          model: RecipeImage,
+          as: "RecipeImages", // alias phải trùng với define association
+          attributes: ["image_id", "image_url", "public_id"],
+        },
+      ],
       order: [["step_number", "ASC"]],
-      include: [{ model: RecipeImage }],
     });
-    res.json(steps);
+
+    res.json({
+      success: true,
+      data: steps,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching steps", error: error.message });
+    console.error("❌ getAllByRecipe error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi lấy danh sách bước",
+      details: error.message,
+    });
   }
 };
 
-// Lấy chi tiết 1 bước
+// 📘 Lấy chi tiết 1 bước
 exports.getStepById = async (req, res) => {
   try {
     const { id } = req.params;
     const step = await RecipeStep.findByPk(id, {
-      include: [{ model: RecipeImage }],
+      include: [
+        {
+          model: RecipeImage,
+          as: "RecipeImages", // hoặc "images" nếu bạn có đặt alias khác
+          attributes: ["image_id", "image_url", "public_id"],
+        },
+      ],
     });
 
-    if (!step) return res.status(404).json({ message: "Step not found" });
-    res.json(step);
+    if (!step) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy bước này",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: step,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching step", error: error.message });
+    console.error("❌ getStepById error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi lấy chi tiết bước",
+      details: error.message,
+    });
   }
 };
 
-// Tạo bước mới
+// ➕ Tạo bước mới
 exports.createStep = async (req, res) => {
   try {
+    console.log("🧾 req.body:", req.body);
+    console.log("📸 req.file:", req.file);
+
     const { recipe_id, step_number, instruction } = req.body;
 
+    // 🔎 Kiểm tra recipe tồn tại
     const recipe = await Recipe.findByPk(recipe_id);
-    if (!recipe) return res.status(404).json({ message: "Recipe not found" });
+    if (!recipe) {
+      return res.status(404).json({
+        success: false,
+        message: "Recipe không tồn tại",
+      });
+    }
 
-    const step = await RecipeStep.create({ recipe_id, step_number, instruction });
-    res.status(201).json(step);
+    // ✅ Tạo bước
+    const step = await RecipeStep.create({
+      recipe_id,
+      step_number,
+      instruction,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Tạo bước thành công",
+      data: step,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error creating step", error: error.message });
+    console.error("❌ createStep error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi tạo bước mới",
+      details: error.message,
+    });
   }
 };
 
-// Cập nhật bước
+// ✏️ Cập nhật bước
 exports.updateStep = async (req, res) => {
   try {
     const { id } = req.params;
     const { step_number, instruction } = req.body;
 
     const step = await RecipeStep.findByPk(id);
-    if (!step) return res.status(404).json({ message: "Step not found" });
+    if (!step) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy bước cần cập nhật",
+      });
+    }
 
-    step.step_number = step_number ?? step.step_number;
-    step.instruction = instruction ?? step.instruction;
+    await step.update({
+      step_number: step_number ?? step.step_number,
+      instruction: instruction ?? step.instruction,
+    });
 
-    await step.save();
-    res.json(step);
+    res.json({
+      success: true,
+      message: "Cập nhật bước thành công",
+      data: step,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error updating step", error: error.message });
+    console.error("❌ updateStep error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi cập nhật bước",
+      details: error.message,
+    });
   }
 };
 
-// Xóa bước
+// 🗑️ Xóa bước
 exports.deleteStep = async (req, res) => {
   try {
     const { id } = req.params;
     const step = await RecipeStep.findByPk(id);
 
-    if (!step) return res.status(404).json({ message: "Step not found" });
+    if (!step) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy bước cần xóa",
+      });
+    }
 
     await step.destroy();
-    res.json({ message: "Step deleted successfully" });
+
+    res.json({
+      success: true,
+      message: "Xóa bước thành công",
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error deleting step", error: error.message });
+    console.error("❌ deleteStep error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi xóa bước",
+      details: error.message,
+    });
   }
 };

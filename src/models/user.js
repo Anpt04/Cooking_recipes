@@ -35,6 +35,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
+    avatar_public_id: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
   }, {
     tableName: "users",
     timestamps: false,

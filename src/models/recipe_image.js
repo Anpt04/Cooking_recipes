@@ -20,10 +20,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false
     },
-    is_main: { 
-        type: DataTypes.BOOLEAN, 
-        defaultValue: false 
-    },
   }, {
     tableName: "recipe_image",
     timestamps: false,

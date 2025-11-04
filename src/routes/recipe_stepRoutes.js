@@ -6,23 +6,23 @@ const {
   updateStep,
   deleteStep,
 } = require("../controllers/recipe_stepController");
-const { authMiddleware } = require("../middlewares/authMiddleware")
+const { authMiddleware } = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 
-// Lấy tất cả bước của 1 recipe
+// 📘 Lấy tất cả bước của 1 công thức
 router.get("/recipe/:recipeId", authMiddleware, getAllSteps);
 
-// Lấy 1 bước
+// 📘 Lấy 1 bước cụ thể
 router.get("/:id", authMiddleware, getStepById);
 
-// Tạo bước
+// ➕ Tạo bước mới
 router.post("/", authMiddleware, createStep);
 
-// Cập nhật bước
+// ✏️ Cập nhật bước
 router.put("/:id", authMiddleware, updateStep);
 
-// Xóa bước
+// 🗑️ Xóa bước
 router.delete("/:id", authMiddleware, deleteStep);
 
 module.exports = router;
