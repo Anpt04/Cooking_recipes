@@ -9,8 +9,9 @@ exports.getIngredientsByRecipe = async (req, res) => {
       include: [
         {
           model: Ingredient,
-          attributes: ["ingredient_id", "name"],
-        },
+          as: 'ingredient',
+          attributes: ['ingredient_id', 'name']
+        }
       ],
     });
 

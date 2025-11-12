@@ -109,37 +109,53 @@ export const RecipeForm = () => {
   };
 
   const fetchRecipe = async () => {
-    try {
-      const recipeData = await recipeAPI.getById(Number(id));
-      const recipe = recipeData.data;
-      setFormData({
-        title: recipe.title,
-        description: recipe.description,
-        cooking_time: recipe.cooking_time || 0,
-        servings: recipe.servings || 1,
-        difficulty_level: recipe.difficulty_level || "easy",
-        image_url: recipe.image_url || "",
-      });
+  try {
+    const recipeData = await recipeAPI.getById(Number(id));
+    const recipe = recipeData.data;
 
-      const stepsData = await recipeStepAPI.getAllByRecipe(Number(id));
-      setSteps(
-        (stepsData.steps || []).map((s: any) => ({
+    setFormData({
+      title: recipe.title,
+      description: recipe.description,
+      cooking_time: recipe.cooking_time || 0,
+      servings: recipe.servings || 1,
+      difficulty_level: recipe.difficulty_level || "easy",
+      image_url: recipe.image_url || "",
+    });
+
+
+    if (recipe.categories && recipe.categories.length > 0) {
+      setSelectedCategories(
+        recipe.categories.map((cat: any) => ({
+          category_id: cat.category_id,
+          name: cat.name,
+        }))
+      );
+    }
+
+
+    const stepsData = await recipeStepAPI.getAllByRecipe(Number(id));
+    if (stepsData.data && stepsData.data.length > 0) {
+       setSteps(
+        (stepsData.data || []).map((s: any) => ({
           instruction: s.instruction,
           image: null,
         }))
       );
-
-      const ingredientsData = await recipeIngredientAPI.getByRecipe(Number(id));
-      setSelectedIngredients(
-        ingredientsData.data?.map((item: any) => ({
-          ingredient_id: item.ingredient_id,
-          quantity: item.quantity || "",
-        })) || []
-      );
-    } catch (error) {
-      console.error("Failed to fetch recipe:", error);
     }
-  };
+    
+
+    const ingredientsData = await recipeIngredientAPI.getByRecipe(Number(id));
+    setSelectedIngredients(
+      ingredientsData.data?.map((item: any) => ({
+        ingredient_id: item.ingredient_id,
+        quantity: item.quantity || "",
+      })) || []
+    );
+  } catch (error) {
+    console.error("❌ Failed to fetch recipe:", error);
+  }
+};
+
 
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) setMainImage(e.target.files[0]);
@@ -465,16 +481,7 @@ export const RecipeForm = () => {
           <div>
             <div className="flex justify-between items-center mb-3">
               <h2 className="font-medium">Các bước nấu</h2>
-              <button
-                type="button"
-                onClick={() =>
-                  setSteps([...steps, { instruction: "", image: null }])
-                }
-                className="text-orange-500 hover:text-orange-600 flex items-center space-x-1"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Thêm bước</span>
-              </button>
+              
             </div>
 
             {steps.map((step, i) => (
@@ -518,6 +525,17 @@ export const RecipeForm = () => {
               </div>
             ))}
           </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSteps([...steps, { instruction: "", image: null }])
+                }
+                className="text-orange-500 hover:text-orange-600 flex items-center space-x-1"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Thêm bước</span>
+              </button>
 
           {/* Buttons */}
           <div className="flex justify-end space-x-4 pt-6">

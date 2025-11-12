@@ -13,6 +13,7 @@ import { Favorites } from './pages/Favorites';
 import { AdminDashboard } from './pages/admin/Dashboard';
 import { AdminCategories } from './pages/admin/AdminCategories';
 import { AdminIngredients } from './pages/admin/AdminIngredients';
+import { Search } from './pages/Search';
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
@@ -102,6 +103,14 @@ function AuthenticatedApp() {
           element={
             <ProtectedRoute>
               <Favorites />
+            </ProtectedRoute>
+          }
+        />
+         <Route
+          path="/search"
+          element={
+            <ProtectedRoute>
+              <Search />
             </ProtectedRoute>
           }
         />

@@ -15,6 +15,7 @@ export const RecipeDetail = () => {
   const [userRating, setUserRating] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [loading, setLoading] = useState(true);
+  const [editingRatingId, setEditingRatingId] = useState<number | null>(null); 
 
   useEffect(() => {
     fetchRecipeData();
@@ -24,14 +25,13 @@ export const RecipeDetail = () => {
     try {
       const recipeData = await recipeAPI.getById(Number(id));
       setRecipe(recipeData.data || recipeData.recipe || recipeData);
-      console.log("recipe");
-      console.log(recipeData);
+
       const stepsData = await recipeStepAPI.getAllByRecipe(Number(id));
       setSteps(stepsData.data || []);
-      console.log("step");
-      console.log(stepsData);
+
       const ratingsData = await rateAPI.getByRecipe(Number(id));
-      setRatings(ratingsData.rates || []);
+      setRatings(ratingsData.data || []);
+      console.log('Ratings from API:', ratingsData.data);
 
       if (user) {
         const favData = await favoriteAPI.getByUser(user.user_id);
@@ -67,22 +67,22 @@ export const RecipeDetail = () => {
     }
   };
 
-  const handleRating = async (rating: number) => {
-    if (!user) return;
+  // const handleRating = async (rating: number) => {
+  //   if (!user) return;
 
-    try {
-      await rateAPI.addOrUpdate({
-        user_id: user.user_id,
-        recipe_id: Number(id),
-        rating,
-        comment: ratingComment,
-      });
-      setUserRating(rating);
-      fetchRecipeData();
-    } catch (error) {
-      console.error('Failed to submit rating:', error);
-    }
-  };
+  //   try {
+  //     await rateAPI.addOrUpdate({
+  //       user_id: user.user_id,
+  //       recipe_id: Number(id),
+  //       rating,
+  //       comment: ratingComment,
+  //     });
+  //     setUserRating(rating);
+  //     fetchRecipeData();
+  //   } catch (error) {
+  //     console.error('Failed to submit rating:', error);
+  //   }
+  // };
 
   const handleDelete = async () => {
     if (!window.confirm('Are you sure you want to delete this recipe?')) return;
@@ -189,7 +189,7 @@ export const RecipeDetail = () => {
                 <Clock className="h-5 w-5 text-orange-500" />
                 <div>
                   <p className="text-sm text-gray-500">Total Time</p>
-                  <p className="font-semibold">{recipe.cook_time} min</p>
+                  <p className="font-semibold">{recipe.cooking_time} min</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
@@ -266,62 +266,173 @@ export const RecipeDetail = () => {
             </div>
             {user && (
               <div className="mb-8 pb-8 border-b border-gray-200">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Rate this recipe</h3>
-                <div className="flex space-x-2 mb-4">
-                  {[1, 2, 3, 4, 5].map(rating => (
-                    <button
-                      key={rating}
-                      onClick={() => handleRating(rating)}
-                      className="hover:scale-110 transition-transform"
-                    >
-                      <Star
-                        className={`h-8 w-8 ${
-                          rating <= userRating
-                            ? 'fill-yellow-400 text-yellow-400'
-                            : 'text-gray-300'
-                        }`}
-                      />
-                    </button>
-                  ))}
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Đánh giá công thức</h3>
+
+                {/* Hiển thị danh sách comment */}
+                <div className="space-y-4">
+                  {ratings.length > 0 ? (
+                    ratings.map((rating) => {
+                      const isOwnerComment = rating.user_id === user?.user_id;
+                      const isEditing = editingRatingId === rating.user_id;
+
+                      return (
+                        <div
+                          key={`${rating.user_id}-${rating.recipe_id}`}
+                          className="bg-gray-50 p-4 rounded-lg shadow-sm"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            {/* Tên và sao theo cột */}
+                            <div className="flex flex-col">
+                              <p className="font-medium text-gray-900">{rating.user.username}</p>
+                              <div className="flex mt-1">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Star
+                                    key={star}
+                                    className={`h-4 w-4 ${
+                                      star <= rating.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Dấu 3 chấm dọc để chỉnh sửa */}
+                            {isOwnerComment && !isEditing && (
+                              <button
+                                onClick={() => {
+                                  setEditingRatingId(rating.user_id);
+                                  setUserRating(rating.rating);
+                                  setRatingComment(rating.comment || '');
+                                }}
+                                className="text-gray-400 hover:text-gray-600 font-bold text-xl"
+                              >
+                                ⋮
+                              </button>
+                            )}
+                          </div>
+                          {/* Comment */}
+                          <p className="text-gray-700">{rating.comment}</p>
+
+                          {/* Nếu đang chỉnh sửa */}
+                          {isEditing && (
+                            <div className="mt-4">
+                              <div className="flex space-x-2 mb-4">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <button
+                                    key={star}
+                                    onClick={() => setUserRating(star)}
+                                    className="hover:scale-110 transition-transform"
+                                  >
+                                    <Star
+                                      className={`h-8 w-8 ${
+                                        star <= userRating
+                                          ? 'fill-yellow-400 text-yellow-400'
+                                          : 'text-gray-300'
+                                      }`}
+                                    />
+                                  </button>
+                                ))}
+                              </div>
+
+                              <textarea
+                                value={ratingComment}
+                                onChange={(e) => setRatingComment(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent mb-4"
+                                rows={3}
+                              />
+
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await rateAPI.addOrUpdate({
+                                      user_id: user.user_id,
+                                      recipe_id: Number(id),
+                                      rating: userRating,
+                                      comment: ratingComment,
+                                    });
+                                    alert('Đã cập nhật đánh giá!');
+                                    setEditingRatingId(null);
+                                    setRatingComment('');
+                                    setUserRating(0);
+                                    fetchRecipeData(); // Cập nhật lại danh sách đánh giá
+                                  } catch (error) {
+                                    console.error('Failed to update rating:', error);
+                                    alert('Không thể lưu đánh giá!');
+                                  }
+                                }}
+                                className="bg-orange-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-orange-600 transition-colors"
+                              >
+                                💾 Lưu chỉnh sửa
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">Chưa có đánh giá nào</p>
+                  )}
                 </div>
-                <textarea
-                  value={ratingComment}
-                  onChange={(e) => setRatingComment(e.target.value)}
-                  placeholder="Add a comment (optional)"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  rows={3}
-                />
+
+                {/* Thêm đánh giá mới nếu chưa có */}
+                {!ratings.some((r) => r.user_id === user?.user_id) && (
+                  <div className="mt-6">
+                    <h4 className="text-lg font-semibold mb-2">Đánh giá của bạn</h4>
+
+                    <div className="flex space-x-2 mb-4">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          onClick={() => setUserRating(star)}
+                          className="hover:scale-110 transition-transform"
+                        >
+                          <Star
+                            className={`h-8 w-8 ${
+                              star <= userRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+
+                    <textarea
+                      value={ratingComment}
+                      onChange={(e) => setRatingComment(e.target.value)}
+                      placeholder="Nhập nhận xét của bạn (tùy chọn)"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent mb-4"
+                      rows={3}
+                    />
+
+                    {(userRating > 0 || ratingComment.trim() !== '') && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await rateAPI.addOrUpdate({
+                              user_id: user.user_id,
+                              recipe_id: Number(id),
+                              rating: userRating,
+                              comment: ratingComment,
+                            });
+                            alert('Đã lưu đánh giá!');
+                            setUserRating(0);
+                            setRatingComment('');
+                            fetchRecipeData();
+                          } catch (error) {
+                            console.error('Failed to submit rating:', error);
+                            alert('Không thể lưu đánh giá!');
+                          }
+                        }}
+                        className="bg-orange-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-orange-600 transition-colors"
+                      >
+                        💾 Lưu đánh giá
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Reviews</h3>
-              <div className="space-y-4">
-                {ratings.map(rating => (
-                  <div key={`${rating.user_id}-${rating.recipe_id}`} className="bg-gray-50 p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="font-medium text-gray-900">{rating.User?.username || 'Anonymous'}</p>
-                      <div className="flex">
-                        {[1, 2, 3, 4, 5].map(star => (
-                          <Star
-                            key={star}
-                            className={`h-4 w-4 ${
-                              star <= rating.rating
-                                ? 'fill-yellow-400 text-yellow-400'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    {rating.comment && <p className="text-gray-700">{rating.comment}</p>}
-                  </div>
-                ))}
-                {ratings.length === 0 && (
-                  <p className="text-gray-500 text-center py-4">No reviews yet</p>
-                )}
-              </div>
-            </div>
+
           </div>
         </div>
       </div>
