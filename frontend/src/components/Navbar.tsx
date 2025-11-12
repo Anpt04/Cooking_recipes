@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { ChefHat, Home, Heart, Plus, User, LogOut, Settings } from 'lucide-react';
+import { ChefHat, Home, Heart, Plus, User, LogOut, Settings, Search } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export const Navbar = () => {
@@ -27,6 +27,16 @@ export const Navbar = () => {
               >
                 <Home className="h-5 w-5" />
                 <span>Home</span>
+              </Link>
+
+              <Link
+                to="/search"
+                className={`flex items-center space-x-1 ${
+                  isActive('/search') ? 'text-orange-500' : 'text-gray-600 hover:text-orange-500'
+                } transition-colors`}
+              >
+                <Search className="h-5 w-5" />
+                <span>Search</span>
               </Link>
 
               <Link

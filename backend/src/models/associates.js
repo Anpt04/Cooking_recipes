@@ -48,13 +48,17 @@ module.exports = (db) => {
     as: 'recipes',
     onDelete: 'CASCADE',
   });
+  RecipeIngredient.belongsTo(Ingredient, { foreignKey: 'ingredient_id', as: 'ingredient' });
+  RecipeIngredient.belongsTo(Recipe, { foreignKey: 'recipe_id', as: 'recipe' });
+  Ingredient.hasMany(RecipeIngredient, { foreignKey: 'ingredient_id', as: 'recipeIngredients' });
+  Recipe.hasMany(RecipeIngredient, { foreignKey: 'recipe_id', as: 'recipeIngredients' });
 
   // User - Favorite (N-N qua Favorite)
-User.hasMany(Favorite, { foreignKey: "user_id", as: "favorites" });
-Favorite.belongsTo(User, { foreignKey: "user_id", as: "user" });
+  User.hasMany(Favorite, { foreignKey: "user_id", as: "favorites" });
+  Favorite.belongsTo(User, { foreignKey: "user_id", as: "user" });
 
-Recipe.hasMany(Favorite, { foreignKey: "recipe_id", as: "favorites" });
-Favorite.belongsTo(Recipe, { foreignKey: "recipe_id", as: "recipe" });
+  Recipe.hasMany(Favorite, { foreignKey: "recipe_id", as: "favorites" });
+  Favorite.belongsTo(Recipe, { foreignKey: "recipe_id", as: "recipe" });
 
   // User - Rate (N-N qua Rate)
   User.belongsToMany(Recipe, {

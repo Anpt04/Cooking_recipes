@@ -36,6 +36,9 @@ module.exports = (sequelize, DataTypes) => {
     image_public_id: { 
         type: DataTypes.TEXT 
     },
+    difficulty:{
+        type: DataTypes.STRING(20), 
+    },
   }, {
     tableName: "recipe",
     timestamps: false,
