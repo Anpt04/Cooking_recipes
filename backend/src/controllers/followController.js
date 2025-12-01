@@ -1,84 +1,112 @@
 const { Follow, User } = require("../models");
 
-// 🟢 Theo dõi một người dùng
-// POST /api/follows
-// body: { follower_id, following_id }
+// Follow
 exports.followUser = async (req, res) => {
   try {
-    const { follower_id, following_id } = req.body;
+    const follower_id = req.user.user_id; 
+    const { following_id } = req.params;
 
-    if (follower_id === following_id) {
-      return res.status(400).json({ success: false, message: "Không thể tự theo dõi chính mình." });
+    if (follower_id == following_id) {
+      return res.status(400).json({ message: "Không thể tự theo dõi chính mình!" });
     }
 
-    const exists = await Follow.findOne({ where: { follower_id, following_id } });
-    if (exists) {
-      return res.status(400).json({ success: false, message: "Bạn đã theo dõi người này rồi." });
-    }
+    await Follow.create({ follower_id, following_id });
 
-    const follow = await Follow.create({ follower_id, following_id });
-    res.status(201).json({ success: true, message: "Theo dõi thành công.", data: follow });
-  } catch (error) {
-    console.error("❌ Lỗi khi theo dõi:", error);
-    res.status(500).json({ success: false, message: "Lỗi server khi theo dõi.", details: error.message });
+    res.json({ success: true, message: "Đã theo dõi" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Lỗi server" });
   }
 };
 
-// 🔴 Hủy theo dõi
-// DELETE /api/follows/:follower_id/:following_id
+// Unfollow
 exports.unfollowUser = async (req, res) => {
   try {
-    const { follower_id, following_id } = req.params;
+    const follower_id = req.user.user_id; 
+    const { following_id } = req.params;
 
-    const follow = await Follow.findOne({ where: { follower_id, following_id } });
-    if (!follow) {
-      return res.status(404).json({ success: false, message: "Bạn chưa theo dõi người này." });
-    }
+    await Follow.destroy({
+      where: { follower_id, following_id },
+    });
 
-    await follow.destroy();
-    res.json({ success: true, message: "Đã hủy theo dõi." });
-  } catch (error) {
-    console.error("❌ Lỗi khi hủy theo dõi:", error);
-    res.status(500).json({ success: false, message: "Lỗi server khi hủy theo dõi.", details: error.message });
+    res.json({ success: true, message: "Đã bỏ theo dõi" });
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi server" });
   }
 };
 
-// 👥 Lấy danh sách người mà user đang theo dõi
-// GET /api/follows/following/:user_id
+// Lấy danh sách tôi theo dõi
 exports.getFollowing = async (req, res) => {
   try {
-    const { user_id } = req.params;
+    const { userId } = req.params;
 
     const following = await Follow.findAll({
-      where: { follower_id: user_id },
+      where: { follower_id: userId },
       include: [
-        { model: User, as: "FollowingUser", attributes: ["user_id", "username", "email"] },
-      ],
+        {
+          model: User,
+          as: "following",
+          attributes: ["user_id", "username", "avatar_url"]
+        }
+      ]
     });
 
-    res.json({ success: true, data: following.map(f => f.FollowingUser) });
-  } catch (error) {
-    console.error("❌ Lỗi khi lấy danh sách đang theo dõi:", error);
-    res.status(500).json({ success: false, message: "Lỗi server khi lấy danh sách đang theo dõi.", details: error.message });
+    res.json({ success: true, data: following });
+  } catch (err) {
+    console.error("❌ getFollowing error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-// 👤 Lấy danh sách người theo dõi user
-// GET /api/follows/followers/:user_id
+
+
+// Lấy danh sách người theo dõi tôi
 exports.getFollowers = async (req, res) => {
   try {
-    const { user_id } = req.params;
+    const { userId } = req.params; 
+    console.log("Followers of:", userId);
 
     const followers = await Follow.findAll({
-      where: { following_id: user_id },
+      where: { following_id: userId },
       include: [
-        { model: User, as: "FollowerUser", attributes: ["user_id", "username", "email"] },
-      ],
+        {
+          model: User,
+          as: "follower",
+          attributes: ["user_id", "username", "avatar_url"]
+        }
+      ]
     });
 
-    res.json({ success: true, data: followers.map(f => f.FollowerUser) });
-  } catch (error) {
-    console.error("❌ Lỗi khi lấy danh sách người theo dõi:", error);
-    res.status(500).json({ success: false, message: "Lỗi server khi lấy danh sách người theo dõi.", details: error.message });
+    res.json({ success: true, data: followers });
+  } catch (err) {
+    console.error("❌ getFollowers error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+
+// Đếm số follower
+exports.countFollowers = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const count = await Follow.count({ where: { following_id: id } });
+
+    res.json({ success: true, count });
+  } catch (err) {
+    console.error("Error countFollowers:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Đếm số following
+exports.countFollowing = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const count = await Follow.count({ where: { follower_id: id } });
+
+    res.json({ success: true, count });
+  } catch (err) {
+    console.error("Error countFollowing:", err);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };

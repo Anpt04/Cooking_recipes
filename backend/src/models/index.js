@@ -24,7 +24,8 @@ fs.readdirSync(__dirname)
   });
 
 // Import và chạy associations
-require('./associates')(db);
+const associates = require('./associates');
+associates(db);
 
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;

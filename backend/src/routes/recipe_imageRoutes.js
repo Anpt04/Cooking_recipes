@@ -1,5 +1,5 @@
 const express = require("express");
-const { addRecipeImage, updateRecipeImage, deleteRecipeImage, getRecipeImages } = require("../controllers/recipe_imageController");
+const { addRecipeImage, updateRecipeImage, deleteRecipeImage, getRecipeImages, deleteByRecipe } = require("../controllers/recipe_imageController");
 const upload = require("../middlewares/imgUpload"); 
 
 const router = express.Router();
@@ -11,9 +11,11 @@ router.get("/", getRecipeImages);
 router.post("/", upload.single("image"), addRecipeImage);
 
 // Sửa ảnh
-router.put("/:image_id", upload.single("image"), updateRecipeImage);
+router.put("/:image_id", upload.single("image"),upload.none(), updateRecipeImage);
 
 // Xóa ảnh
 router.delete("/:image_id", deleteRecipeImage);
+
+router.delete("/recipe/:recipeId", deleteByRecipe);
 
 module.exports = router;

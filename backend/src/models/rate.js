@@ -1,5 +1,10 @@
 module.exports = (sequelize, DataTypes) => {
   const Rate = sequelize.define("Rate", {
+    rate_id: {
+        type: DataTypes.INTEGER, 
+        autoIncrement: true, 
+        primaryKey: true 
+    },
     user_id: { 
         type: DataTypes.INTEGER, 
         primaryKey: true 
@@ -21,7 +26,9 @@ module.exports = (sequelize, DataTypes) => {
     },
   }, {
     tableName: "rate",
-    timestamps: false,
+    timestamps: true,
+    createdAt: "created_at",
+    updatedAt: false,         
   });
 
   return Rate;

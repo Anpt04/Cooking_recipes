@@ -11,10 +11,15 @@ module.exports = (db) => {
     RecipeIngredient,
     Favorite,
     Rate,
-    ShoppingList,
-    ShoppingListItem,
     RecipeCategory, 
-    Follow
+    Follow,
+    RateReport,
+    IngredientRequest,
+    RecipeReport,
+    UserReport,
+    MealPlan,
+    MealPlanRecipe,
+    ShoppingListItem
   } = db;
 
   // User - Recipe (1-N)
@@ -76,18 +81,6 @@ module.exports = (db) => {
     as: 'RatedBy',
   });
 
-  // User - ShoppingList (1-N)
-  User.hasMany(ShoppingList, { foreignKey: 'user_id', onDelete: 'CASCADE' });
-  ShoppingList.belongsTo(User, { foreignKey: 'user_id' });
-
-  // ShoppingList - ShoppingListItem (1-N)
-  ShoppingList.hasMany(ShoppingListItem, { foreignKey: 'list_id', onDelete: 'CASCADE' });
-  ShoppingListItem.belongsTo(ShoppingList, { foreignKey: 'list_id' });
-
-  // Ingredient - ShoppingListItem (1-N)
-  Ingredient.hasMany(ShoppingListItem, { foreignKey: 'ingredient_id', onDelete: 'CASCADE' });
-  ShoppingListItem.belongsTo(Ingredient, { foreignKey: 'ingredient_id' });
-
 
   // Recipe <-> Category (N-N)
   Recipe.belongsToMany(Category, {
@@ -102,11 +95,15 @@ module.exports = (db) => {
     otherKey: 'recipe_id'
   });
 
-  User.hasMany(Follow, { foreignKey: "follower_id", as: "Following" });
-  User.hasMany(Follow, { foreignKey: "following_id", as: "Followers" });
+  Follow.belongsTo(User, {
+    foreignKey: "follower_id",
+    as: "follower"
+  });
 
-  Follow.belongsTo(User, { foreignKey: "follower_id", as: "FollowerUser" });
-  Follow.belongsTo(User, { foreignKey: "following_id", as: "FollowingUser" });
+  Follow.belongsTo(User, {
+    foreignKey: "following_id",
+    as: "following"
+  });
 
   User.hasMany(Rate, { foreignKey: 'user_id', as: 'rates' });
   Rate.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
@@ -114,5 +111,80 @@ module.exports = (db) => {
   // Recipe – Rate (nếu có)
   Recipe.hasMany(Rate, { foreignKey: 'recipe_id', as: 'rates' });
   Rate.belongsTo(Recipe, { foreignKey: 'recipe_id', as: 'recipe' });
+  
+  RateReport.belongsTo(Rate, { foreignKey: "rate_id" });
+  RateReport.belongsTo(Rate, {
+    foreignKey: "rate_id",
+    as: "rate",
+  });
 
+  RateReport.belongsTo(User, {
+    foreignKey: "reporter_id",
+    as: "reporter"
+  });
+
+  User.hasMany(RateReport, {
+    foreignKey: "reporter_id",
+    as: "reports_sent"
+  });
+ 
+  IngredientRequest.belongsTo(User, { foreignKey: "user_id" });
+
+  RecipeReport.belongsTo(Recipe, { foreignKey: "recipe_id", as: "recipe" });
+  RecipeReport.belongsTo(User, { foreignKey: "reporter_id", as: "reporter" });
+
+  UserReport.belongsTo(User, { as: "reporter", foreignKey: "reporter_id" });
+  UserReport.belongsTo(User, { as: "reportedUser", foreignKey: "reported_user_id" });
+
+   User.hasMany(MealPlan, { foreignKey: 'user_id' });
+  MealPlan.belongsTo(User, { foreignKey: 'user_id' });
+
+  MealPlan.belongsToMany(Recipe, {
+    through: MealPlanRecipe,
+    foreignKey: 'mealplan_id',
+    otherKey: 'recipe_id',
+    as: 'recipes',
+    onDelete: 'CASCADE',
+    hooks: true,
+  });
+
+  Recipe.belongsToMany(MealPlan, {
+    through: MealPlanRecipe,
+    foreignKey: 'recipe_id',
+    otherKey: 'mealplan_id',
+    as: 'mealplans',
+    onDelete: 'CASCADE',
+    hooks: true,
+  });
+
+  MealPlanRecipe.belongsTo(MealPlan, {
+    foreignKey: 'mealplan_id',
+    onDelete: 'CASCADE',
+    hooks: true,
+  });
+
+  MealPlanRecipe.belongsTo(Recipe, {
+    foreignKey: 'recipe_id',
+    onDelete: 'CASCADE',
+    hooks: true,
+  });
+
+  MealPlan.hasMany(MealPlanRecipe, {
+    foreignKey: 'mealplan_id',
+    onDelete: 'CASCADE',
+    hooks: true,
+  });
+
+  Recipe.hasMany(MealPlanRecipe, {
+    foreignKey: 'recipe_id',
+    onDelete: 'CASCADE',
+    hooks: true,
+  });
+
+  // 📌 ShoppingListItem - MealPlan & Ingredient
+  MealPlan.hasMany(ShoppingListItem, { foreignKey: 'mealplan_id' });
+  ShoppingListItem.belongsTo(MealPlan, { foreignKey: 'mealplan_id' });
+
+  Ingredient.hasMany(ShoppingListItem, { foreignKey: 'ingredient_id' });
+  ShoppingListItem.belongsTo(Ingredient, { foreignKey: 'ingredient_id', as: "Ingredient"  });
 };

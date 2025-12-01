@@ -39,6 +39,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
+    warning_count: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    banned_until: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    }
   }, {
     tableName: "users",
     timestamps: false,

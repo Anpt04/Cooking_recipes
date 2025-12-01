@@ -39,6 +39,15 @@ module.exports = (sequelize, DataTypes) => {
     difficulty:{
         type: DataTypes.STRING(20), 
     },
+    status: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: "pending",
+    },
+    reject_reason: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+    },
   }, {
     tableName: "recipe",
     timestamps: false,

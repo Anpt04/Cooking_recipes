@@ -167,3 +167,32 @@ exports.deleteRecipeImage = async function (req, res) {
     });
   }
 };
+// xóa toàn bộ ảnh của recipe
+exports.deleteByRecipe = async (req, res) => {
+  try {
+    const { recipeId } = req.params;
+
+    const images = await RecipeImage.findAll({ where: { recipe_id: recipeId } });
+
+    for (const img of images) {
+      if (img.public_id) {
+        await cloudinary.uploader.destroy(img.public_id);
+      }
+    }
+
+    await RecipeImage.destroy({ where: { recipe_id: recipeId } });
+
+    res.json({
+      success: true,
+      message: `Đã xóa toàn bộ ảnh của recipe ${recipeId}`,
+    });
+  } catch (err) {
+    console.error("❌ deleteByRecipe error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi xóa ảnh theo recipe",
+      details: err.message,
+    });
+  }
+};
+
