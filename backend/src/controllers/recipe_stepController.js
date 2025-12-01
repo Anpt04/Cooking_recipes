@@ -167,3 +167,53 @@ exports.deleteStep = async (req, res) => {
     });
   }
 };
+
+exports.deleteStepsByRecipe = async (req, res) => {
+  try {
+    const { recipeId } = req.params;
+
+    // 🔎 Lấy danh sách step_id
+    const steps = await RecipeStep.findAll({
+      where: { recipe_id: recipeId },
+      attributes: ["step_id"],
+    });
+
+    if (!steps.length) {
+      return res.json({
+        success: true,
+        message: "Không có bước nào để xóa",
+      });
+    }
+
+    const stepIds = steps.map((s) => s.step_id);
+
+    // 🗑 XÓA ẢNH liên quan step
+    const images = await RecipeImage.findAll({
+      where: { step_id: stepIds },
+    });
+
+    for (const img of images) {
+      if (img.public_id) {
+        await cloudinary.uploader.destroy(img.public_id);
+      }
+    }
+
+    await RecipeImage.destroy({ where: { step_id: stepIds } });
+
+    // 🗑 XOÁ STEP
+    await RecipeStep.destroy({ where: { recipe_id: recipeId } });
+
+    res.json({
+      success: true,
+      message: `Đã xóa ${stepIds.length} bước và ${images.length} ảnh`,
+    });
+
+  } catch (err) {
+    console.error("❌ deleteStepsByRecipe error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi xóa tất cả bước",
+      details: err.message,
+    });
+  }
+};

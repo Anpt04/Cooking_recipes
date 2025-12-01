@@ -10,6 +10,10 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false, 
         unique: true 
     },
+    unit: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
   }, {
     tableName: "ingredient",
     timestamps: false,

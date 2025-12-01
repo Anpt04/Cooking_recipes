@@ -34,4 +34,23 @@ const authorizeRole = (roles = []) => (req, res, next) => {
   next();
 };
 
-module.exports = { authMiddleware, authorizeRole };
+const checkBan = (req, res, next) => {
+  const user = req.user;
+
+  // khóa vĩnh viễn
+  if (user.status == "ban") {
+    return res.status(403).json({ message: "Tài khoản đã bị khóa vĩnh viễn" });
+  }
+
+  // khóa theo ngày
+  if (user.banned_until && new Date(user.banned_until) > new Date()) {
+    return res.status(403).json({
+      message: `Tài khoản bị khóa đến: ${user.banned_until}`,
+    });
+  }
+
+  next();
+};
+
+
+module.exports = { authMiddleware, authorizeRole, checkBan };

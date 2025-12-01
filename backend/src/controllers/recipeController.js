@@ -1,5 +1,5 @@
 const fs = require("fs");
-const { Recipe, Category, User, Ingredient, RecipeIngredient } = require("../models");
+const { Recipe, Category, User, Ingredient, RecipeIngredient, RecipeReport } = require("../models");
 const cloudinary = require("../config/cloudinary");
 
 // ======================= Lấy tất cả công thức =======================
@@ -10,7 +10,15 @@ exports.getAllRecipes = async (req, res) => {
         {
           model: Category,
           as: "categories",
-          through: { attributes: [] }, // không trả về dữ liệu trung gian
+          through: { attributes: [] },
+        },
+        {
+          model: Ingredient,
+          as: "ingredients",
+          attributes: ["ingredient_id", "name"],
+          through: {
+            attributes: ["quantity"],
+          },
         },
         {
           model: User,
@@ -48,7 +56,7 @@ exports.getRecipeById = async (req, res) => {
         {
           model: Ingredient,
           as: "ingredients",
-          attributes: ["ingredient_id", "name"],
+          attributes: ["ingredient_id", "name", "unit"],
           through: {
             attributes: ["quantity"], 
           },
@@ -76,7 +84,7 @@ exports.getRecipeById = async (req, res) => {
 // ======================= Thêm mới công thức =======================
 exports.createRecipe = async (req, res) => {
   try {
-    const { user_id, title, description, cooking_time, servings, category_ids } = req.body;
+    const { user_id, title, description, cooking_time, servings, category_ids, difficulty } = req.body;
     const file = req.file;
 
     if (!user_id || !title) {
@@ -113,6 +121,7 @@ exports.createRecipe = async (req, res) => {
       servings,
       image_url,
       image_public_id,
+      difficulty,
     });
 
     // ✅ Gán category
@@ -151,7 +160,7 @@ exports.updateRecipe = async (req, res) => {
       });
     }
 
-    const { title, description, cooking_time, servings, category_ids } = req.body || {};
+    const { title, description, cooking_time, servings, category_ids, difficulty } = req.body || {};
     const file = req.file;
 
     let image_url = recipe.image_url;
@@ -185,6 +194,7 @@ exports.updateRecipe = async (req, res) => {
       image_url,
       image_public_id,
       updated_at: new Date(),
+      difficulty: difficulty ?? recipe.difficulty,
     });
 
     // Update categories nếu có
@@ -231,3 +241,229 @@ exports.deleteRecipe = async (req, res) => {
     });
   }
 };
+//=======lấy công thức chờ duyệt======
+exports.getPendingRecipes = async (req, res) => {
+  try {
+    const recipes = await Recipe.findAll({
+      where: { status: "pending" },
+      include: [
+        { model: User, attributes: ["username"] },
+        { model: Category, as: "categories" }
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    res.json({ success: true, data: recipes });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Admin duyệt công thức
+exports.approveRecipe = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await Recipe.update(
+      { status: "approved", reject_reason: null },
+      { where: { recipe_id: id } }
+    );
+
+    res.json({ success: true, message: "Recipe approved!" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Admin từ chối công thức
+exports.rejectRecipe = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason)
+      return res.status(400).json({ success: false, message: "Reason required" });
+
+    await Recipe.update(
+      { status: "rejected", reject_reason: reason },
+      { where: { recipe_id: id } }
+    );
+
+    res.json({ success: true, message: "Recipe rejected" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// lấy công thức đã duyệt
+exports.getApprovedRecipes = async (req, res) => {
+  try {
+    const recipes = await Recipe.findAll({
+      where: { status: "approved" },
+      include: [
+        {
+          model: Category,
+          as: "categories",
+          through: { attributes: [] },
+        },
+        {
+          model: Ingredient,
+          as: "ingredients",
+          attributes: ["ingredient_id", "name"],
+          through: {
+            attributes: ["quantity"],
+          },
+        },
+        {
+          model: User,
+          attributes: ["user_id", "username"],
+        },
+      ],
+      order: [["recipe_id", "ASC"]],
+    });
+    res.json({
+      success: true,
+      data: recipes,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+//lấy công thức theo status
+exports.getRecipesByUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.query;
+
+    const whereClause = { user_id: id };
+    if (status) whereClause.status = status;
+
+    const recipes = await Recipe.findAll({ where: whereClause });
+
+    res.json({ success: true, data: recipes });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// User -> gửi báo cáo recipe
+exports.reportRecipe = async (req, res) => {
+  try {
+    const { id } = req.params; // recipe_id
+    const { reason } = req.body;
+    const reporter_id = req.user?.user_id;
+
+    if (!reporter_id) return res.status(401).json({ success: false, message: "Unauthorized" });
+    if (!reason || reason.trim() === "") {
+      return res.status(400).json({ success: false, message: "Lý do báo cáo là bắt buộc" });
+    }
+
+    // Optionally: kiểm tra recipe tồn tại
+    const recipe = await Recipe.findByPk(id);
+    if (!recipe) return res.status(404).json({ success: false, message: "Recipe not found" });
+
+    const report = await RecipeReport.create({
+      recipe_id: id,
+      reporter_id,
+      reason: reason.trim(),
+    });
+
+    res.status(201).json({ success: true, message: "Đã gửi báo cáo", report });
+  } catch (err) {
+    console.error("reportRecipe error:", err);
+    res.status(500).json({ success: false, message: "Server error", details: err.message });
+  }
+};
+
+// Admin -> lấy list báo cáo (kèm recipe + reporter)
+exports.getAllReports = async (req, res) => {
+  try {
+    const { status } = req.query;
+    const where = {};
+    if (status) where.status = status;
+
+    const reports = await RecipeReport.findAll({
+      where,
+      include: [
+        { model: User, as: "reporter", attributes: ["user_id", "username", "email"] },
+        { model: Recipe, as: "recipe", attributes: ["recipe_id", "title", "image_url", "user_id"] },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    res.json({ success: true, reports });
+  } catch (err) {
+    console.error("getAllReports error:", err);
+    res.status(500).json({ success: false, message: "Server error", details: err.message });
+  }
+};
+
+// Admin -> resolve
+exports.resolveReport = async (req, res) => {
+  try {
+    const { id } = req.params;        // report_id
+    const { admin_note } = req.body;  // ghi chú admin
+
+    // Lấy report
+    const report = await RecipeReport.findByPk(id);
+    if (!report) {
+      return res.status(404).json({ success: false, message: "Report not found" });
+    }
+
+    // Lấy recipe liên quan
+    const recipe = await Recipe.findByPk(report.recipe_id);
+    if (!recipe) {
+      return res.status(404).json({ success: false, message: "Recipe not found" });
+    }
+
+    // --- 1) Cập nhật báo cáo ---
+    report.status = "resolved";
+    report.admin_note = admin_note || report.admin_note;
+    await report.save();
+
+    // --- 2) Tự động reject recipe ---
+    await Recipe.update(
+      {
+        status: "rejected",
+        reject_reason: admin_note || "Recipe vi phạm quy tắc!",
+      },
+      { where: { recipe_id: recipe.recipe_id } }
+    );
+
+    res.json({
+      success: true,
+      message: "Report resolved and recipe rejected",
+      report,
+    });
+
+  } catch (err) {
+    console.error("resolveReport error:", err);
+    res.status(500).json({ success: false, message: "Server error", details: err.message });
+  }
+};
+
+
+// Admin -> reject
+exports.rejectReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { admin_note } = req.body;
+
+    if (!admin_note) {
+      return res.status(400).json({ success: false, message: "admin_note is required when rejecting" });
+    }
+
+    const report = await RecipeReport.findByPk(id);
+    if (!report) return res.status(404).json({ success: false, message: "Report not found" });
+
+    report.status = "rejected";
+    report.admin_note = admin_note;
+    await report.save();
+
+    res.json({ success: true, message: "Report rejected", report });
+  } catch (err) {
+    console.error("rejectReport error:", err);
+    res.status(500).json({ success: false, message: "Server error", details: err.message });
+  }
+};
+

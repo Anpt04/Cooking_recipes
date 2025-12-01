@@ -1,4 +1,4 @@
-const { User } = require("../models");
+const { User, UserReport } = require("../models");
 const fs = require("fs");
 const cloudinary = require("../config/cloudinary");
 
@@ -99,5 +99,140 @@ exports.updateUser = async (req, res) => {
       message: "Lỗi server khi cập nhật người dùng",
       details: err.message,
     });
+  }
+};
+// GET user by ID
+exports.getUserById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findOne({
+      where: { user_id: id },
+      attributes: ["user_id", "username", "email", "avatar_url", "created_at"]
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy người dùng."
+      });
+    }
+
+    res.json({
+      success: true,
+      user
+    });
+
+  } catch (error) {
+    console.error("Error getUserById:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi lấy thông tin người dùng."
+    });
+  }
+};
+
+exports.reportUser = async (req, res) => {
+  try {
+    const reported_user_id = req.params.user_id;
+    const reporter_id = req.user.user_id;
+    const { reason } = req.body;
+
+    if (!reason) return res.status(400).json({ message: "reason is required" });
+
+    const report = await UserReport.create({
+      reporter_id,
+      reported_user_id,
+      reason,
+    });
+
+    res.json({ success: true, message: "Đã gửi báo cáo", report });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getAllUserReports = async (req, res) => {
+  try {
+    const { status } = req.query;
+    const where = {};
+    if (status) where.status = status;
+
+    const reports = await UserReport.findAll({
+      where,
+      include: [
+        { model: User, as: "reporter", attributes: ["user_id", "username"] },
+        { model: User, as: "reportedUser", attributes: ["user_id", "username"] },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    res.json({ success: true, reports });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.resolveUserReport = async (req, res) => {
+  try {
+    const { admin_note, action } = req.body;
+
+    const report = await UserReport.findByPk(req.params.id);
+
+    if (!report) return res.status(404).json({ message: "Report not found" });
+
+    // 1) Cập nhật trạng thái báo cáo
+    report.status = "resolved";
+    report.admin_note = admin_note;
+    await report.save();
+
+    // 2) Xử lý người dùng bị báo cáo
+    const user = await User.findByPk(report.reported_user_id);
+
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
+
+    if (action === "warn") {
+      user.warning_count = (user.warning_count || 0) + 1;
+    }
+
+    if (user.warning_count == 7) {
+      user.banned_until = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    }
+
+    if (user.warning_count == 10) {
+      user.status = "ban";
+    }
+    if (action === "ban"){
+      user.status = "ban";
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Report resolved and user processed",
+      report,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
+exports.rejectUserReport = async (req, res) => {
+  try {
+    const { admin_note } = req.body;
+    const report = await UserReport.findByPk(req.params.id);
+
+    if (!report) return res.status(404).json({ message: "Report not found" });
+
+    report.status = "rejected";
+    report.admin_note = admin_note;
+    await report.save();
+
+    res.json({ success: true, message: "Report rejected", report });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };

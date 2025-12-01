@@ -1,26 +1,21 @@
-// routes/followRoutes.js
 const express = require("express");
+const router = express.Router();
+const { authMiddleware, authorizeRole } = require("../middlewares/authMiddleware");
 const {
   followUser,
   unfollowUser,
-  getFollowing,
   getFollowers,
+  getFollowing,
+  countFollowers,
+  countFollowing
 } = require("../controllers/followController");
 
-const { authMiddleware } = require("../middlewares/authMiddleware");
+router.post("/:following_id", authMiddleware, followUser);
+router.delete("/:following_id", authMiddleware, unfollowUser);
 
-const router = express.Router();
+router.get("/:userId/followers", getFollowers);
+router.get("/:userId/following", getFollowing);
 
-// 🔹 Theo dõi người khác
-router.post("/", authMiddleware, followUser);
-
-// 🔹 Hủy theo dõi
-router.delete("/:follower_id/:following_id", authMiddleware, unfollowUser);
-
-// 🔹 Lấy danh sách người mà user đang theo dõi
-router.get("/following/:user_id", authMiddleware, getFollowing);
-
-// 🔹 Lấy danh sách người theo dõi user
-router.get("/followers/:user_id", authMiddleware, getFollowers);
-
+router.get("/:id/followers/count", countFollowers);
+router.get("/:id/following/count", countFollowing);
 module.exports = router;
