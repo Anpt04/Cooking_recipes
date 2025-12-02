@@ -59,12 +59,27 @@ exports.login = async (req, res) => {
     if (!user) {
       return res.status(400).json({ message: "Sai email hoặc mật khẩu" });
     }
+    
+    if (user.status === "ban") {
+      return res.status(403).json({
+        success: false,
+        message: "Tài khoản của bạn đã bị khóa",
+      });
+    }
 
-    // Kiểm tra mật khẩu
+    if (user.banned_until && new Date(user.banned_until) > new Date()) {
+      return res.status(403).json({
+        success: false,
+        message: `Tài khoản bị khóa đến ngày ${user.banned_until}`,
+      });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(400).json({ message: "Sai email hoặc mật khẩu" });
     }
+
+    
 
     // Tạo JWT token
     const token = jwt.sign(
@@ -72,6 +87,8 @@ exports.login = async (req, res) => {
       process.env.JWT_SECRET ,
       { expiresIn: "30d" }
     );
+
+    
 
     return res.json({
       message: "Đăng nhập thành công",

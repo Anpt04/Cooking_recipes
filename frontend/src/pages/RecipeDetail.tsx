@@ -1,58 +1,90 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link, data } from 'react-router-dom';
-import { Clock, Users, ChefHat, Star, Heart, Trash2, Edit } from 'lucide-react';
-import { recipeAPI, recipeStepAPI, favoriteAPI, rateAPI } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
+import { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { Clock, Users, ChefHat, Star, Heart } from "lucide-react";
+import {
+  recipeAPI,
+  recipeStepAPI,
+  favoriteAPI,
+  rateAPI,
+  rateReportAPI,
+} from "../services/api";
+import { useAuth } from "../contexts/AuthContext";
+import { toast } from "sonner";
+import bg from "../img/home_background.jpeg";
+
+const BACKGROUND = bg;
 
 export const RecipeDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+
   const [recipe, setRecipe] = useState<any>(null);
   const [steps, setSteps] = useState<any[]>([]);
   const [ratings, setRatings] = useState<any[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
   const [userRating, setUserRating] = useState(0);
-  const [ratingComment, setRatingComment] = useState('');
+  const [ratingComment, setRatingComment] = useState("");
   const [loading, setLoading] = useState(true);
-  const [editingRatingId, setEditingRatingId] = useState<number | null>(null); 
+
+  const [editingRatingId, setEditingRatingId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+
+  const [reportRecipeOpen, setReportRecipeOpen] = useState(false);
+  const [reportRatingOpen, setReportRatingOpen] = useState(false);
+  const [reportReasonRecipe, setReportReasonRecipe] = useState("");
+  const [reportReasonComment, setReportReasonComment] = useState("");
+  const [reportRatingId, setReportRatingId] = useState<number | null>(null);
+
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchRecipeData();
+    fetchData();
   }, [id]);
 
-  const fetchRecipeData = async () => {
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node))
+        setOpenMenuId(null);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
+  const fetchData = async () => {
     try {
       const recipeData = await recipeAPI.getById(Number(id));
-      setRecipe(recipeData.data || recipeData.recipe || recipeData);
+      setRecipe(recipeData.data || recipeData.recipe);
 
-      const stepsData = await recipeStepAPI.getAllByRecipe(Number(id));
-      setSteps(stepsData.data || []);
+      const stepData = await recipeStepAPI.getAllByRecipe(Number(id));
+      setSteps(stepData.data || []);
 
-      const ratingsData = await rateAPI.getByRecipe(Number(id));
-      setRatings(ratingsData.data || []);
-      console.log('Ratings from API:', ratingsData.data);
+      const ratingData = await rateAPI.getByRecipe(Number(id));
+      setRatings(ratingData.data || []);
 
       if (user) {
-        const favData = await favoriteAPI.getByUser(user.user_id);
-        const isFav = favData.favorites?.some((f: any) => f.recipe_id === Number(id));
-        setIsFavorite(isFav);
+        const fav = await favoriteAPI.getByUser(user.user_id);
+        setIsFavorite(
+          fav?.favorites?.some((f: any) => f.recipe_id === Number(id))
+        );
 
-        const existingRating = ratingsData.rates?.find((r: any) => r.user_id === user.user_id);
-        if (existingRating) {
-          setUserRating(existingRating.rating);
-          setRatingComment(existingRating.comment || '');
+        const myRating = ratingData.rates?.find(
+          (r: any) => r.user_id === user.user_id
+        );
+        if (myRating) {
+          setUserRating(myRating.rating);
+          setRatingComment(myRating.comment || "");
         }
       }
-    } catch (error) {
-      console.error('Failed to fetch recipe:', error);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
   const toggleFavorite = async () => {
-    if (!user) return;
+    if (!user) return toast.error("Bạn cần đăng nhập");
 
     try {
       if (isFavorite) {
@@ -62,200 +94,266 @@ export const RecipeDetail = () => {
         await favoriteAPI.add({ user_id: user.user_id, recipe_id: Number(id) });
         setIsFavorite(true);
       }
-    } catch (error) {
-      console.error('Failed to toggle favorite:', error);
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  // const handleRating = async (rating: number) => {
-  //   if (!user) return;
-
-  //   try {
-  //     await rateAPI.addOrUpdate({
-  //       user_id: user.user_id,
-  //       recipe_id: Number(id),
-  //       rating,
-  //       comment: ratingComment,
-  //     });
-  //     setUserRating(rating);
-  //     fetchRecipeData();
-  //   } catch (error) {
-  //     console.error('Failed to submit rating:', error);
-  //   }
-  // };
-
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this recipe?')) return;
+    if (!window.confirm("Bạn chắc chắn muốn xóa?")) return;
 
     try {
       await recipeAPI.delete(Number(id));
-      navigate('/');
-    } catch (error) {
-      console.error('Failed to delete recipe:', error);
+      toast.success("Đã xóa công thức");
+      navigate("/");
+    } catch {
+      toast.error("Không thể xóa");
     }
   };
 
-  if (loading) {
+  const submitRecipeReport = async () => {
+    if (!reportReasonRecipe.trim()) {
+      toast.error("Nhập lý do trước khi gửi");
+      return;
+    }
+
+    try {
+      await recipeAPI.report(Number(id), reportReasonRecipe);
+      toast.success("Đã gửi báo cáo");
+      setReportRecipeOpen(false);
+      setReportReasonRecipe("");
+    } catch {
+      toast.error("Không thể gửi báo cáo");
+    }
+  };
+
+  const submitRatingReport = async () => {
+    if (!reportReasonComment.trim()) {
+      toast.error("Nhập lý do!");
+      return;
+    }
+
+    try {
+      await rateReportAPI.report(reportRatingId!, reportReasonComment);
+      toast.success("Đã gửi báo cáo");
+      setReportRatingOpen(false);
+      setReportReasonComment("");
+    } catch {
+      toast.error("Không thể gửi báo cáo");
+    }
+  };
+
+  if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+        <div className="h-12 w-12 border-b-2 border-orange-500 rounded-full animate-spin"></div>
       </div>
     );
-  }
 
-  if (!recipe) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Recipe not found</p>
-      </div>
-    );
-  }
+  if (!recipe)
+    return <div className="text-center mt-20 text-gray-500">Không tìm thấy</div>;
 
-  const averageRating = ratings.length > 0
-    ? ratings.reduce((acc, r) => acc + r.rating, 0) / ratings.length
-    : 0;
+  const avgRating =
+    ratings.length > 0
+      ? ratings.reduce((a, b) => a + b.rating, 0) / ratings.length
+      : 0;
 
   const isOwner = user?.user_id === recipe.user_id;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          <div className="h-96 bg-gradient-to-br from-orange-200 to-amber-200 flex items-center justify-center relative">
-            {recipe.image_url ? (
-              <img
-                src={recipe.image_url}
-                alt={recipe.title}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <ChefHat className="h-32 w-32 text-orange-400" />
-            )}
-            {user && (
-              <button
-                onClick={toggleFavorite}
-                className="absolute top-4 right-4 bg-white p-3 rounded-full shadow-lg hover:scale-110 transition-transform"
-              >
-                <Heart
-                  className={`h-6 w-6 ${
-                    isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-400'
-                  }`}
-                />
-              </button>
-            )}
+    <div
+      className="min-h-screen bg-cover bg-center bg-fixed"
+      style={{ backgroundImage: `url(${BACKGROUND})` }}
+    >
+      <div className="bg-white/70 backdrop-blur-sm min-h-full pb-10">
+        {/* HEADER IMAGE */}
+        <div className="relative h-56 bg-cover bg-center rounded-b-3xl shadow-lg"
+          style={{ backgroundImage: `url(${BACKGROUND})` }}
+        >
+          <div className="absolute inset-0 bg-black/40 rounded-b-3xl"></div>
+
+          <div className="absolute inset-0 flex flex-col justify-center px-6 max-w-5xl mx-auto">
+            <h1 className="text-4xl font-extrabold text-white drop-shadow">
+              Chi tiết công thức
+            </h1>
+            <p className="text-orange-200">Thông tin – nguyên liệu – đánh giá</p>
           </div>
+        </div>
 
-          <div className="p-8">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <span className="text-xs font-semibold text-orange-500 uppercase">
-                  {recipe.categories && recipe.categories.length > 0
-                    ? recipe.categories.map((c: { name: string }) => c.name).join(', ')
-                    : 'Uncategorized'}
-                </span>
-                <h1 className="text-4xl font-bold text-gray-900 mb-2">{recipe.title}</h1>
-                <p className="text-gray-600 flex items-center space-x-2">
-                  <span>By</span>
-                  <Link
-                    to={`/profile/${recipe.user_id}`}
-                    className="font-medium text-orange-500 hover:text-orange-600"
-                  >
-                    {recipe.User?.username || 'Unknown'}
-                  </Link>
-                </p>
-              </div>
-              {isOwner && (
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => navigate(`/recipes/${id}/edit`)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  >
-                    <Edit className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                </div>
-              )}
-            </div>
+        {/* MAIN CONTENT */}
+        <div className="max-w-5xl mx-auto mt-10 p-4">
+          <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
 
-            <p className="text-gray-700 text-lg mb-6">{recipe.description}</p>
-
-            <div className="flex items-center space-x-6 mb-8 pb-6 border-b border-gray-200">
-              <div className="flex items-center space-x-2">
-                <Clock className="h-5 w-5 text-orange-500" />
-                <div>
-                  <p className="text-sm text-gray-500">Total Time</p>
-                  <p className="font-semibold">{recipe.cooking_time} min</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Users className="h-5 w-5 text-orange-500" />
-                <div>
-                  <p className="text-sm text-gray-500">Servings</p>
-                  <p className="font-semibold">{recipe.servings}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Star className="h-5 w-5 text-orange-500" />
-                <div>
-                  <p className="text-sm text-gray-500">Rating</p>
-                  <p className="font-semibold">{averageRating.toFixed(1)} ({ratings.length})</p>
-                </div>
-              </div>
-            </div>
-            {/* Ingredients Section */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Ingredients</h2>
-
-              {recipe.ingredients && recipe.ingredients.length > 0 ? (
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {recipe.ingredients.map((ing: any, i: number) => (
-                    <li
-                      key={i}
-                      className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-md border border-gray-200 text-sm"
-                    >
-                      <span className="font-medium text-gray-800 truncate max-w-[70%]">
-                        {ing.name}
-                      </span>
-                      <span className="text-gray-600 text-xs whitespace-nowrap">
-                        {ing.RecipeIngredient?.quantity || '—'}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+            {/* IMAGE + FAVORITE BUTTON */}
+            <div className="relative h-96 bg-gray-200">
+              {recipe.image_url ? (
+                <img
+                  src={recipe.image_url}
+                  className="w-full h-full object-cover"
+                />
               ) : (
-                <p className="text-gray-500 text-sm">No ingredients listed.</p>
+                <div className="w-full h-full flex items-center justify-center">
+                  <ChefHat className="h-32 w-32 text-gray-400" />
+                </div>
+              )}
+
+              {user && (
+                <button
+                  onClick={toggleFavorite}
+                  className="absolute top-4 right-4 bg-white p-3 rounded-full shadow hover:scale-110 transition"
+                >
+                  <Heart
+                    className={`h-6 w-6 ${isFavorite ? "text-red-500 fill-red-500" : "text-gray-400"
+                      }`}
+                  />
+                </button>
               )}
             </div>
 
+            {/* DETAILS */}
+            <div className="p-6">
+              <div className="flex justify-between">
+
+                <div>
+                  <span className="text-orange-600 font-medium uppercase text-sm">
+                    {recipe.categories?.map((c: any) => c.name).join(", ") ||
+                      "Không phân loại"}
+                  </span>
+
+                  <h1 className="text-3xl font-bold mt-1">{recipe.title}</h1>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {recipe.categories?.map((cat: any) => (
+                      <span
+                        key={cat.category_id}
+                        className="px-4 py-2 rounded-full bg-orange-100 text-orange-700 font-medium text-sm shadow-sm"
+                      >
+                        {cat.name}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-gray-600 mt-1">
+                    Đăng bởi{" "}
+                    <Link
+                      to={`/profile/${recipe.user_id}`}
+                      className="text-orange-600 font-medium"
+                    >
+                      {recipe.User?.username}
+                    </Link>
+                  </p>
+                </div>
 
 
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Instructions</h2>
-              <div className="space-y-6">
-                {steps.map((step, index) => (
-                  <div key={step.step_id} className="bg-gray-50 p-4 rounded-lg shadow-sm">
-                    <div className="flex items-center mb-3">
-                      <div className="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold mr-3">
-                        {index + 1}
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-800">Bước {index + 1}</h3>
+                {/* MENU 3 CHẤM */}
+                <div className="relative">
+                  <button
+                    onClick={() => setOpenMenuId(openMenuId === -1 ? null : -1)}
+                    className="px-3 py-1 text-xl text-gray-600 hover:bg-gray-100 rounded-lg"
+                  >
+                    ⋮
+                  </button>
+
+                  {openMenuId === -1 && (
+                    <div
+                      ref={menuRef}
+                      className="absolute right-full mt-2 w-40 bg-white shadow-xl border rounded-xl z-50 animate-fadeIn"
+                    >
+                      {isOwner ? (
+                        <>
+                          <button
+                            onClick={() => navigate(`/recipes/${id}/edit`)}
+                            className="block w-full px-4 py-2 text-left hover:bg-gray-100"
+                          >
+                            Chỉnh sửa
+                          </button>
+
+                          <button
+                            onClick={handleDelete}
+                            className="block w-full px-4 py-2 text-left text-red-600 hover:bg-gray-100"
+                          >
+                            Xóa
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setOpenMenuId(null);
+                            setReportRecipeOpen(true);
+                          }}
+                          className="block w-full px-4 py-2 text-left text-red-600 hover:bg-gray-100"
+                        >
+                          Báo cáo
+                        </button>
+                      )}
                     </div>
+                  )}
+                </div>
+              </div>
 
-                    <p className="text-gray-700 mb-3">{step.instruction}</p>
+              {/* DESCRIPTION */}
+              <p className="text-gray-700 mt-4">{recipe.description}</p>
 
-                    {step.RecipeImages && step.RecipeImages.length > 0 && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-2">
-                        {step.RecipeImages.map((img: any, i: number) => (
+              {/* INFO GRID */}
+              <div className="grid grid-cols-3 gap-6 mt-6 border-b pb-6">
+                <div className="flex gap-2 items-center">
+                  <Clock className="text-orange-500" />
+                  <div>
+                    <p className="text-gray-600 text-sm">Thời gian</p>
+                    <p className="font-semibold">{recipe.cooking_time} phút</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 items-center">
+                  <Users className="text-orange-500" />
+                  <div>
+                    <p className="text-gray-600 text-sm">Khẩu phần</p>
+                    <p className="font-semibold">{recipe.servings} người</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 items-center">
+                  <Star className="text-orange-500" />
+                  <div>
+                    <p className="text-gray-600 text-sm">Đánh giá</p>
+                    <p className="font-semibold">
+                      {avgRating.toFixed(1)} ({ratings.length})
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* INGREDIENTS */}
+              <h2 className="text-2xl font-bold mt-8 mb-3">Nguyên liệu</h2>
+
+              <div className="grid grid-cols-2 gap-3">
+                {recipe.ingredients?.map((ing: any, i: number) => (
+                  <div
+                    key={i}
+                    className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border"
+                  >
+                    <span>{ing.name}</span>
+                    <span className="text-gray-600">
+                      {parseFloat(ing.RecipeIngredient.quantity)} {ing.unit}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* STEPS */}
+              <h2 className="text-2xl font-bold mt-10 mb-3">Cách làm</h2>
+
+              <div className="space-y-4">
+                {steps.map((s, idx) => (
+                  <div key={idx} className="bg-gray-50 p-4 rounded-xl shadow-sm">
+                    <h3 className="font-semibold">Bước {idx + 1}</h3>
+                    <p className="text-gray-700 mt-2">{s.instruction}</p>
+
+                    {s.RecipeImages?.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+                        {s.RecipeImages.map((img: any, i: number) => (
                           <img
                             key={i}
                             src={img.image_url}
-                            alt={`Step ${index + 1} image ${i + 1}`}
-                            className="w-full h-40 object-cover rounded-lg border border-gray-200"
+                            className="rounded-lg border h-32 w-full object-cover"
                           />
                         ))}
                       </div>
@@ -263,179 +361,256 @@ export const RecipeDetail = () => {
                   </div>
                 ))}
               </div>
-            </div>
-            {user && (
-              <div className="mb-8 pb-8 border-b border-gray-200">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Đánh giá công thức</h3>
 
-                {/* Hiển thị danh sách comment */}
-                <div className="space-y-4">
-                  {ratings.length > 0 ? (
-                    ratings.map((rating) => {
-                      const isOwnerComment = rating.user_id === user?.user_id;
-                      const isEditing = editingRatingId === rating.user_id;
+              {/* RATINGS */}
+              <h2 className="text-2xl font-bold mt-10 mb-3">Đánh giá</h2>
+              {user && !ratings.some(r => r.user_id === user.user_id) && (
+                <div className="bg-white p-4 rounded-xl shadow mb-6">
+                  <h3 className="font-semibold text-lg mb-2">Viết đánh giá của bạn</h3>
 
-                      return (
-                        <div
-                          key={`${rating.user_id}-${rating.recipe_id}`}
-                          className="bg-gray-50 p-4 rounded-lg shadow-sm"
+                  {/* CHỌN SỐ SAO */}
+                  <div className="flex gap-1 mb-3">
+                    {[1, 2, 3, 4, 5].map(num => (
+                      <Star
+                        key={num}
+                        onClick={() => setUserRating(num)}
+                        className={`w-7 h-7 cursor-pointer ${num <= userRating ? "text-yellow-500 fill-yellow-500" : "text-gray-300"
+                          }`}
+                      />
+                    ))}
+                  </div>
+
+                  <textarea
+                    className="w-full border rounded-xl p-3"
+                    rows={3}
+                    placeholder="Nhập cảm nhận của bạn..."
+                    value={ratingComment}
+                    onChange={(e) => setRatingComment(e.target.value)}
+                  />
+
+                  <button
+                    onClick={async () => {
+                      try {
+                        await rateAPI.addOrUpdate({
+                          user_id: user.user_id,
+                          recipe_id: Number(id),
+                          rating: userRating,
+                          comment: ratingComment,
+                        });
+                        toast.success("Đã gửi đánh giá");
+                        fetchData(); // load lại dữ liệu
+                      } catch {
+                        toast.error("Không thể gửi đánh giá");
+                      }
+                    }}
+                    className="mt-3 bg-orange-600 text-white px-4 py-2 rounded-xl"
+                  >
+                    Gửi đánh giá
+                  </button>
+                </div>
+              )}
+
+              {/* FORM CHỈNH SỬA ĐÁNH GIÁ CHO USER ĐÃ ĐÁNH GIÁ */}
+              {user && ratings.some(r => r.user_id === user.user_id) && editingRatingId === user.user_id && (
+                <div className="bg-white p-4 rounded-xl shadow mb-6">
+                  <h3 className="font-semibold text-lg mb-2">Chỉnh sửa đánh giá của bạn</h3>
+
+                  {/* CHỌN SỐ SAO */}
+                  <div className="flex gap-1 mb-3">
+                    {[1, 2, 3, 4, 5].map(num => (
+                      <Star
+                        key={num}
+                        onClick={() => setUserRating(num)}
+                        className={`w-7 h-7 cursor-pointer ${num <= userRating ? "text-yellow-500 fill-yellow-500" : "text-gray-300"
+                          }`}
+                      />
+                    ))}
+                  </div>
+
+                  <textarea
+                    className="w-full border rounded-xl p-3"
+                    rows={3}
+                    placeholder="Nhập cảm nhận của bạn..."
+                    value={ratingComment}
+                    onChange={(e) => setRatingComment(e.target.value)}
+                  />
+
+                  <button
+                    onClick={async () => {
+                      try {
+                        await rateAPI.addOrUpdate({
+                          user_id: user.user_id,
+                          recipe_id: Number(id),
+                          rating: userRating,
+                          comment: ratingComment,
+                        });
+                        toast.success("Đã cập nhật đánh giá");
+                        setEditingRatingId(null);
+                        fetchData();
+                      } catch {
+                        toast.error("Không thể cập nhật");
+                      }
+                    }}
+                    className="mt-3 bg-orange-600 text-white px-4 py-2 rounded-xl"
+                  >
+                    Lưu thay đổi
+                  </button>
+                </div>
+              )}
+
+
+              <div className="space-y-4">
+                {ratings.length === 0 && (
+                  <p className="text-gray-500">Chưa có đánh giá nào.</p>
+                )}
+
+                {ratings.map((r: any) => (
+                  <div key={r.rate_id} className="bg-gray-50 p-4 rounded-xl relative">
+                    <div className="flex justify-between">
+                      <div>
+                        <p className="font-semibold">{r.user.username}</p>
+                        <p className="text-gray-500 text-sm">
+                          {new Date(r.created_at).toLocaleDateString("vi-VN")}
+                        </p>
+                      </div>
+
+                      {/* Rating menu */}
+                      <div className="relative">
+                        <button
+                          onClick={() =>
+                            setOpenMenuId(
+                              openMenuId === r.rate_id ? null : r.rate_id
+                            )
+                          }
+                          className="text-xl text-gray-500"
                         >
-                          <div className="flex items-start justify-between mb-2">
-                            {/* Tên và sao theo cột */}
-                            <div className="flex flex-col">
-                              <p className="font-medium text-gray-900">{rating.user.username}</p>
-                              <div className="flex mt-1">
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                  <Star
-                                    key={star}
-                                    className={`h-4 w-4 ${
-                                      star <= rating.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-                                    }`}
-                                  />
-                                ))}
-                              </div>
-                            </div>
+                          ⋮
+                        </button>
 
-                            {/* Dấu 3 chấm dọc để chỉnh sửa */}
-                            {isOwnerComment && !isEditing && (
+                        {openMenuId === r.rate_id && (
+                          <div
+                            ref={menuRef}
+                            className="absolute right-full ml-2 mt-2 w-40 bg-white shadow-xl border rounded-xl z-50"
+                          >
+                            {r.user_id === user?.user_id ? (
                               <button
                                 onClick={() => {
-                                  setEditingRatingId(rating.user_id);
-                                  setUserRating(rating.rating);
-                                  setRatingComment(rating.comment || '');
+                                  setEditingRatingId(r.user_id);
+                                  setUserRating(r.rating);
+                                  setRatingComment(r.comment);
+                                  setOpenMenuId(null);
                                 }}
-                                className="text-gray-400 hover:text-gray-600 font-bold text-xl"
+                                className="block w-full px-4 py-2 text-left hover:bg-gray-100"
                               >
-                                ⋮
+                                Chỉnh sửa
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setReportRatingId(r.rate_id);
+                                  setReportRatingOpen(true);
+                                  setOpenMenuId(null);
+                                }}
+                                className="block w-full px-4 py-2 text-left text-red-600 hover:bg-gray-100"
+                              >
+                                Báo cáo
                               </button>
                             )}
                           </div>
-                          {/* Comment */}
-                          <p className="text-gray-700">{rating.comment}</p>
+                        )}
+                      </div>
+                    </div>
 
-                          {/* Nếu đang chỉnh sửa */}
-                          {isEditing && (
-                            <div className="mt-4">
-                              <div className="flex space-x-2 mb-4">
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                  <button
-                                    key={star}
-                                    onClick={() => setUserRating(star)}
-                                    className="hover:scale-110 transition-transform"
-                                  >
-                                    <Star
-                                      className={`h-8 w-8 ${
-                                        star <= userRating
-                                          ? 'fill-yellow-400 text-yellow-400'
-                                          : 'text-gray-300'
-                                      }`}
-                                    />
-                                  </button>
-                                ))}
-                              </div>
-
-                              <textarea
-                                value={ratingComment}
-                                onChange={(e) => setRatingComment(e.target.value)}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent mb-4"
-                                rows={3}
-                              />
-
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    await rateAPI.addOrUpdate({
-                                      user_id: user.user_id,
-                                      recipe_id: Number(id),
-                                      rating: userRating,
-                                      comment: ratingComment,
-                                    });
-                                    alert('Đã cập nhật đánh giá!');
-                                    setEditingRatingId(null);
-                                    setRatingComment('');
-                                    setUserRating(0);
-                                    fetchRecipeData(); // Cập nhật lại danh sách đánh giá
-                                  } catch (error) {
-                                    console.error('Failed to update rating:', error);
-                                    alert('Không thể lưu đánh giá!');
-                                  }
-                                }}
-                                className="bg-orange-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-orange-600 transition-colors"
-                              >
-                                💾 Lưu chỉnh sửa
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="text-gray-500 text-center py-4">Chưa có đánh giá nào</p>
-                  )}
-                </div>
-
-                {/* Thêm đánh giá mới nếu chưa có */}
-                {!ratings.some((r) => r.user_id === user?.user_id) && (
-                  <div className="mt-6">
-                    <h4 className="text-lg font-semibold mb-2">Đánh giá của bạn</h4>
-
-                    <div className="flex space-x-2 mb-4">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          onClick={() => setUserRating(star)}
-                          className="hover:scale-110 transition-transform"
-                        >
-                          <Star
-                            className={`h-8 w-8 ${
-                              star <= userRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                    <div className="flex mt-1">
+                      {[1, 2, 3, 4, 5].map((x) => (
+                        <Star
+                          key={x}
+                          className={`w-5 h-5 ${x <= r.rating
+                            ? "text-yellow-500 fill-yellow-500"
+                            : "text-gray-300"
                             }`}
-                          />
-                        </button>
+                        />
                       ))}
                     </div>
 
-                    <textarea
-                      value={ratingComment}
-                      onChange={(e) => setRatingComment(e.target.value)}
-                      placeholder="Nhập nhận xét của bạn (tùy chọn)"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent mb-4"
-                      rows={3}
-                    />
-
-                    {(userRating > 0 || ratingComment.trim() !== '') && (
-                      <button
-                        onClick={async () => {
-                          try {
-                            await rateAPI.addOrUpdate({
-                              user_id: user.user_id,
-                              recipe_id: Number(id),
-                              rating: userRating,
-                              comment: ratingComment,
-                            });
-                            alert('Đã lưu đánh giá!');
-                            setUserRating(0);
-                            setRatingComment('');
-                            fetchRecipeData();
-                          } catch (error) {
-                            console.error('Failed to submit rating:', error);
-                            alert('Không thể lưu đánh giá!');
-                          }
-                        }}
-                        className="bg-orange-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-orange-600 transition-colors"
-                      >
-                        💾 Lưu đánh giá
-                      </button>
-                    )}
+                    <p className="text-gray-700 mt-2">{r.comment}</p>
                   </div>
-                )}
+                ))}
               </div>
-            )}
+            </div>
+
+
 
 
           </div>
         </div>
       </div>
+      {/* ================= REPORT RECIPE MODAL ================= */}
+      {reportRecipeOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99999] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-xl shadow-xl p-6">
+            <h2 className="text-xl font-bold mb-3">Báo cáo công thức</h2>
+
+            <textarea
+              className="w-full border rounded-xl p-3"
+              rows={4}
+              placeholder="Nhập lý do..."
+              value={reportReasonRecipe}
+              onChange={(e) => setReportReasonRecipe(e.target.value)}
+            />
+
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                onClick={() => setReportRecipeOpen(false)}
+                className="px-4 py-2 bg-gray-200 rounded-xl"
+              >
+                Hủy
+              </button>
+
+              <button
+                onClick={submitRecipeReport}
+                className="px-4 py-2 bg-red-600 text-white rounded-xl"
+              >
+                Gửi báo cáo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* ================= REPORT RATING MODAL ================= */}
+      {reportRatingOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99999] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-xl shadow-xl p-6">
+            <h2 className="text-xl font-bold mb-3">Báo cáo đánh giá</h2>
+
+            <textarea
+              className="w-full border rounded-xl p-3"
+              rows={4}
+              placeholder="Nhập lý do..."
+              value={reportReasonComment}
+              onChange={(e) => setReportReasonComment(e.target.value)}
+            />
+
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                onClick={() => setReportRatingOpen(false)}
+                className="px-4 py-2 bg-gray-200 rounded-xl"
+              >
+                Hủy
+              </button>
+
+              <button
+                onClick={submitRatingReport}
+                className="px-4 py-2 bg-red-600 text-white rounded-xl"
+              >
+                Gửi báo cáo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
