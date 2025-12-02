@@ -155,14 +155,16 @@ exports.reportUser = async (req, res) => {
 exports.getAllUserReports = async (req, res) => {
   try {
     const { status } = req.query;
-    const where = {};
+    const where = {
+      
+    };
     if (status) where.status = status;
 
     const reports = await UserReport.findAll({
       where,
       include: [
         { model: User, as: "reporter", attributes: ["user_id", "username"] },
-        { model: User, as: "reportedUser", attributes: ["user_id", "username"] },
+        { model: User, as: "reportedUser", attributes: ["user_id", "username", "status"] },
       ],
       order: [["created_at", "DESC"]],
     });

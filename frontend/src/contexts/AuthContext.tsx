@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    setUser(null);
+    setUser(null); 
   };
 
   const isAdmin = user?.role === "admin";
@@ -118,10 +118,14 @@ export const useAuth = () => {
   return context;
 };
 
-export const AdminLayout = () => {
-  const { user } = useAuth();
+export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
 
-  if (!user || user.role !== "admin") {
-    return <Navigate to="/login" replace />;
-  }
+  if (loading) return <div>⏳ Checking permission...</div>;
+
+  if (!user) return <Navigate to="/login" replace />;
+
+  if (user.role !== "admin") return <Navigate to="/" replace />;
+
+  return <>{children}</>;
 };

@@ -39,7 +39,7 @@ export const Register = () => {
           </div>
         </div>
 
-        <h2 className="text-3xl font-bold text-center text-gray-900 mb-2">Create Account</h2>
+        <h2 className="text-3xl font-bold text-center text-gray-900 mb-2">Đăng ký</h2>
         <p className="text-center text-gray-600 mb-8">Join RecipeShare community today</p>
 
         {error && (
@@ -60,13 +60,12 @@ export const Register = () => {
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
               required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-              placeholder="johndoe"
             />
           </div>
 
           <div>
             <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-2">
-              Full Name
+              Tên
             </label>
             <input
               id="full_name"
@@ -74,13 +73,12 @@ export const Register = () => {
               value={formData.full_name}
               onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-              placeholder="John Doe"
             />
           </div>
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
+              Email
             </label>
             <input
               id="email"
@@ -95,7 +93,7 @@ export const Register = () => {
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-              Password
+              Mật khẩu
             </label>
             <input
               id="password"
@@ -113,14 +111,14 @@ export const Register = () => {
             disabled={loading}
             className="w-full bg-orange-500 text-white py-3 rounded-lg font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Creating account...' : 'Sign Up'}
+            {loading ? 'Creating account...' : 'Đăng ký'}
           </button>
         </form>
 
         <p className="mt-6 text-center text-gray-600">
-          Already have an account?{' '}
+          Đã có tài khoản?{' '}
           <Link to="/login" className="text-orange-500 hover:text-orange-600 font-medium">
-            Sign in
+            Đăng nhập
           </Link>
         </p>
       </div>
