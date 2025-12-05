@@ -9,7 +9,7 @@ import {
   rateReportAPI,
 } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { toast } from "sonner";
+import toast from "react-hot-toast";
 import bg from "../img/home_background.jpeg";
 
 const BACKGROUND = bg;
@@ -64,8 +64,11 @@ export const RecipeDetail = () => {
 
       if (user) {
         const fav = await favoriteAPI.getByUser(user.user_id);
+
+        const favList = fav?.data || fav?.favorites || [];
+
         setIsFavorite(
-          fav?.favorites?.some((f: any) => f.recipe_id === Number(id))
+          favList.some((f: any) => f.recipe_id === Number(id))
         );
 
         const myRating = ratingData.rates?.find(
@@ -83,21 +86,32 @@ export const RecipeDetail = () => {
     }
   };
 
-  const toggleFavorite = async () => {
-    if (!user) return toast.error("Bạn cần đăng nhập");
+const toggleFavorite = async () => {
+  if (!user) return toast.error("Bạn cần đăng nhập để yêu thích!");
 
-    try {
-      if (isFavorite) {
-        await favoriteAPI.remove(user.user_id, Number(id));
-        setIsFavorite(false);
-      } else {
-        await favoriteAPI.add({ user_id: user.user_id, recipe_id: Number(id) });
-        setIsFavorite(true);
-      }
-    } catch (e) {
-      console.error(e);
+  try {
+    if (isFavorite) {
+      await favoriteAPI.remove(user.user_id, Number(id));
+      setIsFavorite(false);
+
+      toast.success("Đã xóa khỏi danh sách yêu thích 💔");
+
+    } else {
+      await favoriteAPI.add({
+        user_id: user.user_id,
+        recipe_id: Number(id),
+      });
+
+      setIsFavorite(true);
+
+      toast.success("Đã thêm vào danh sách yêu thích ❤️");
     }
-  };
+  } catch (e) {
+    console.error(e);
+    toast.error("Lỗi khi cập nhật yêu thích!");
+  }
+};
+
 
   const handleDelete = async () => {
     if (!window.confirm("Bạn chắc chắn muốn xóa?")) return;
@@ -185,7 +199,7 @@ export const RecipeDetail = () => {
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
 
             {/* IMAGE + FAVORITE BUTTON */}
-            <div className="relative h-96 bg-gray-200">
+            <div className="relative  bg-gray-200">
               {recipe.image_url ? (
                 <img
                   src={recipe.image_url}
@@ -353,7 +367,7 @@ export const RecipeDetail = () => {
                           <img
                             key={i}
                             src={img.image_url}
-                            className="rounded-lg border h-32 w-full object-cover"
+                            className="rounded-lg border h-full w-full object-cover"
                           />
                         ))}
                       </div>
@@ -391,22 +405,28 @@ export const RecipeDetail = () => {
                   <button
                     onClick={async () => {
                       try {
+                        if (userRating === 0)
+                          return toast.error("Vui lòng chọn số sao trước khi gửi!");
+
                         await rateAPI.addOrUpdate({
                           user_id: user.user_id,
                           recipe_id: Number(id),
                           rating: userRating,
                           comment: ratingComment,
                         });
-                        toast.success("Đã gửi đánh giá");
-                        fetchData(); // load lại dữ liệu
+
+                        toast.success("Cảm ơn bạn đã gửi đánh giá! ⭐");
+
+                        fetchData();
                       } catch {
-                        toast.error("Không thể gửi đánh giá");
+                        toast.error("Không thể gửi đánh giá, vui lòng thử lại!");
                       }
                     }}
                     className="mt-3 bg-orange-600 text-white px-4 py-2 rounded-xl"
                   >
                     Gửi đánh giá
                   </button>
+
                 </div>
               )}
 
@@ -444,17 +464,20 @@ export const RecipeDetail = () => {
                           rating: userRating,
                           comment: ratingComment,
                         });
-                        toast.success("Đã cập nhật đánh giá");
+
+                        toast.success("Bạn đã cập nhật đánh giá thành công! ✨");
+
                         setEditingRatingId(null);
                         fetchData();
                       } catch {
-                        toast.error("Không thể cập nhật");
+                        toast.error("Không thể cập nhật đánh giá!");
                       }
                     }}
                     className="mt-3 bg-orange-600 text-white px-4 py-2 rounded-xl"
                   >
                     Lưu thay đổi
                   </button>
+
                 </div>
               )}
 

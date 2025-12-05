@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Clock, Users, Star, Heart } from 'lucide-react';
-import { recipeAPI, favoriteAPI, categoryAPI } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { Clock, Users, Star, Heart } from "lucide-react";
+import { recipeAPI, favoriteAPI, categoryAPI } from "../services/api";
+import { useAuth } from "../contexts/AuthContext";
 import homeBg from "../img/home_background.jpeg";
+import toast from "react-hot-toast";
+import homeBg_fot from "../img/1_bg_head.png";
 
 interface Recipe {
   recipe_id: number;
@@ -22,59 +24,55 @@ interface Recipe {
 
 export const Home = () => {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [latestRecipes, setLatestRecipes] = useState<Recipe[]>([]); 
+  const [latestRecipes, setLatestRecipes] = useState<Recipe[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const { user } = useAuth();
-
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchData(page);
+  }, [page]);
 
-  const fetchData = async () => {
+  const fetchData = async (p = 1) => {
     try {
-      const [recipesData, categoriesData] = await Promise.all([
-        recipeAPI.getApproved(),
+      const [recipesRes, categoriesData] = await Promise.all([
+        recipeAPI.getApproved(p),
         categoryAPI.getAll(),
       ]);
 
-      const recipeList: Recipe[] = Array.isArray(recipesData?.data)
-        ? recipesData.data
-        : Array.isArray(recipesData)
-        ? recipesData
-        : [];
-
+      const recipeList = recipesRes.data || [];
       setRecipes(recipeList);
+      setPage(recipesRes.page);
+      setTotalPages(recipesRes.totalPages);
 
-      const sortedLatest = [...recipeList]
-        .sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() -
-            new Date(a.created_at).getTime()
-        )
-        .slice(0, 10);
+      if (p === 1) {
+        const sortedLatest = [...recipeList]
+          .sort(
+            (a, b) =>
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime()
+          )
+          .slice(0, 10);
 
-      setLatestRecipes(sortedLatest);
+        setLatestRecipes(sortedLatest);
+      }
 
-      const categoriesList = Array.isArray(categoriesData?.data)
-        ? categoriesData.data
-        : categoriesData;
-
+      const categoriesList = categoriesData.data || categoriesData;
       setCategories(categoriesList);
 
       if (user) {
         const favData = await favoriteAPI.getByUser(user.user_id);
         const favSet = new Set<number>(
-          favData.data?.map(
-            (f: any) => f.recipe_id ?? f.recipe?.recipe_id
-          ) || []
+          favData.data?.map((f: any) => f.recipe_id ?? f.recipe?.recipe_id) ||
+            []
         );
         setFavorites(favSet);
       }
     } catch (error) {
-      console.error('Lỗi tải dữ liệu:', error);
+      console.error("Lỗi tải dữ liệu:", error);
     } finally {
       setLoading(false);
     }
@@ -90,12 +88,14 @@ export const Home = () => {
           newSet.delete(recipeId);
           return newSet;
         });
+        toast.success("Đã xóa khỏi danh sách yêu thích 💔");
       } else {
         await favoriteAPI.add({ user_id: user.user_id, recipe_id: recipeId });
         setFavorites((prev) => new Set(prev).add(recipeId));
+        toast.success("Đã thêm vào danh sách yêu thích ❤️");
       }
     } catch (error) {
-      console.error('Lỗi khi thêm/xoá yêu thích:', error);
+      console.error("Lỗi khi thêm/xoá yêu thích:", error);
     }
   };
 
@@ -115,7 +115,6 @@ export const Home = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       {/* HERO */}
       <div
         className="relative w-full h-[380px] bg-cover bg-center flex items-center"
@@ -136,10 +135,9 @@ export const Home = () => {
 
       {/* SLIDER */}
       <div className="max-w-8xl mx-auto px-4 -mt-20 relative z-20">
-        <div className="rounded-2xl overflow-hidden shadow-lg"> 
+        <div className="rounded-2xl overflow-hidden shadow-lg">
           <div className="relative w-full overflow-hidden">
             <div className="flex animate-infinite-loop">
-
               {[...latestRecipes, ...latestRecipes].map((recipe, index) => (
                 <Link
                   key={index}
@@ -157,7 +155,6 @@ export const Home = () => {
                   </div>
                 </Link>
               ))}
-
             </div>
           </div>
         </div>
@@ -169,6 +166,10 @@ export const Home = () => {
             display: flex;
             animation: infiniteLoop 40s linear infinite;
             width: max-content;
+          }
+
+          .animate-infinite-loop:hover {
+            animation-play-state: paused;
           }
 
           @keyframes infiniteLoop {
@@ -185,8 +186,8 @@ export const Home = () => {
             onClick={() => setSelectedCategory(null)}
             className={`px-4 py-2 rounded-full font-medium whitespace-nowrap transition-all ${
               selectedCategory === null
-                ? 'bg-orange-500 text-white shadow-lg'
-                : 'bg-white text-gray-700 hover:bg-orange-50'
+                ? "bg-orange-500 text-white shadow-lg"
+                : "bg-white text-gray-700 hover:bg-orange-50"
             }`}
           >
             Tất cả công thức
@@ -195,11 +196,14 @@ export const Home = () => {
           {categories.map((cat) => (
             <button
               key={cat.category_id}
-              onClick={() => setSelectedCategory(cat.category_id)}
+              onClick={() => {
+                setSelectedCategory(cat.category_id);
+                setPage(1);
+              }}
               className={`px-4 py-2 rounded-full font-medium whitespace-nowrap transition-all ${
                 selectedCategory === cat.category_id
-                  ? 'bg-orange-500 text-white shadow-lg'
-                  : 'bg-white text-gray-700 hover:bg-orange-50'
+                  ? "bg-orange-500 text-white shadow-lg"
+                  : "bg-white text-gray-700 hover:bg-orange-50"
               }`}
             >
               {cat.name}
@@ -215,7 +219,10 @@ export const Home = () => {
               className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow"
             >
               <div className="relative h-48 bg-gradient-to-br from-orange-200 to-amber-200">
-                <Link to={`/recipes/${recipe.recipe_id}`} className="absolute inset-0">
+                <Link
+                  to={`/recipes/${recipe.recipe_id}`}
+                  className="absolute inset-0"
+                >
                   {recipe.image_url ? (
                     <img
                       src={recipe.image_url}
@@ -235,8 +242,8 @@ export const Home = () => {
                   <Heart
                     className={`h-5 w-5 ${
                       favorites.has(recipe.recipe_id)
-                        ? 'fill-red-500 text-red-500'
-                        : 'text-gray-400'
+                        ? "fill-red-500 text-red-500"
+                        : "text-gray-400"
                     }`}
                   />
                 </button>
@@ -294,6 +301,32 @@ export const Home = () => {
           ))}
         </div>
 
+        {selectedCategory === null && (
+          <div className="flex justify-center mt-10 gap-3">
+            {/* TRANG TRƯỚC */}
+            <button
+              disabled={page === 1}
+              onClick={() => setPage(page - 1)}
+              className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+            >
+              Trang trước
+            </button>
+
+            <span className="px-4 py-2 font-semibold">
+              {page} / {totalPages}
+            </span>
+
+            {/* TRANG TIẾP */}
+            <button
+              disabled={page === totalPages}
+              onClick={() => setPage(page + 1)}
+              className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+            >
+              Trang tiếp
+            </button>
+          </div>
+        )}
+
         {filteredRecipes.length === 0 && (
           <div className="text-center py-12">
             <p className="text-gray-500 text-lg">
@@ -302,6 +335,13 @@ export const Home = () => {
           </div>
         )}
       </div>
+      <div
+        className="mt-20 w-full h-[380px] bg-cover bg-center rounded-t-2xl shadow-lg"
+        style={{
+          backgroundImage: `url(${homeBg_fot})`,
+          backgroundPosition: "center 100%",
+        }}
+      ></div>
     </div>
   );
 };

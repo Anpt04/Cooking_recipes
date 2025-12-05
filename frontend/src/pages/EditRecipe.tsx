@@ -209,7 +209,7 @@ export default function EditRecipe() {
     );
   };
 
-  // ===== SYNC CATEGORIES (GIỮ NGUYÊN LOGIC) =====
+  // ===== SYNC CATEGORIES  =====
   const syncCategories = async (recipeId: number) => {
     const oldSet = new Set(initialCategories.map((c) => c.category_id));
     const newSet = new Set(selectedCategories.map((c) => c.category_id));
@@ -227,7 +227,7 @@ export default function EditRecipe() {
     setInitialCategories(selectedCategories);
   };
 
-  // ===== SYNC INGREDIENTS (GIỮ NGUYÊN LOGIC) =====
+  // ===== SYNC INGREDIENTS =====
   const syncIngredients = async (recipeId: number) => {
     const oldMap = new Map(initialIngredients.map((i) => [i.ingredient_id, i.quantity]));
     const newMap = new Map(selectedIngredients.map((i) => [i.ingredient_id, i.quantity]));
@@ -250,7 +250,7 @@ export default function EditRecipe() {
     setInitialIngredients(selectedIngredients);
   };
 
-  // ===== UPDATE STEPS + IMAGES (GIỮ NGUYÊN LOGIC) =====
+  // ===== UPDATE STEPS + IMAGES =====
   const upsertStepsWithImages = async (recipeId: number) => {
     for (let index = 0; index < steps.length; index++) {
       const step = steps[index];
@@ -328,7 +328,7 @@ export default function EditRecipe() {
 
       await upsertStepsWithImages(recipeId);
 
-      toast.success("✔ Cập nhật công thức thành công!");
+      toast.success("Cập nhật công thức thành công!");
       navigate(`/recipes/${recipeId}`);
     } catch (e) {
       toast.error("Không thể cập nhật công thức!");
@@ -345,11 +345,6 @@ export default function EditRecipe() {
       </div>
     );
   }
-
-  // ====================================================================================
-  // ==================== UI GIỐNG CREATE + HEADER ẢNH ================================
-  // ====================================================================================
-
   return (
     <div
       className="min-h-screen bg-cover bg-center bg-fixed"
