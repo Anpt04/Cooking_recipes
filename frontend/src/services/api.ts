@@ -204,8 +204,10 @@ export const recipeAPI = {
     return handleResponse(response);
   },
 
-  getApproved: async () => {
-    const response = await fetch(`${API_BASE_URL}/recipes/approved`);
+  getApproved: async (page = 1) => {
+    const response = await fetch(
+      `${API_BASE_URL}/recipes/approved?page=${page}`
+    );
     return handleResponse(response);
   },
 

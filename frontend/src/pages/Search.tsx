@@ -1,13 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import {
-  Search as SearchIcon,
-  Filter,
-  Clock,
-  Users,
-  Star,
-  Heart,
-} from "lucide-react";
+import { Search as SearchIcon, Clock, Users, Heart } from "lucide-react";
 import {
   recipeAPI,
   categoryAPI,
@@ -16,6 +9,7 @@ import {
 } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import SearchBg from "../img/search_bg.png";
+import toast from "react-hot-toast";
 interface Recipe {
   recipe_id: number;
   title: string;
@@ -82,19 +76,17 @@ export const Search = () => {
 
   const fetchData = async () => {
     try {
-      const [recipesData, categoriesData, ingredientsData] = await Promise.all(
-        [
-          recipeAPI.getApproved(),
-          categoryAPI.getAll(),
-          ingredientAPI.getAll(),
-        ]
-      );
+      const [recipesData, categoriesData, ingredientsData] = await Promise.all([
+        recipeAPI.getAll(),
+        categoryAPI.getAll(),
+        ingredientAPI.getAll(),
+      ]);
 
       const recipesList = Array.isArray(recipesData?.data)
         ? recipesData.data
         : Array.isArray(recipesData)
-          ? recipesData
-          : [];
+        ? recipesData
+        : [];
 
       const categoriesList = Array.isArray(categoriesData?.data)
         ? categoriesData.data
@@ -170,27 +162,36 @@ export const Search = () => {
     maxCookingTime,
   ]);
 
-  const toggleFavorite = async (recipeId: number) => {
-    if (!user) return;
-    try {
-      if (favorites.has(recipeId)) {
-        await favoriteAPI.remove(user.user_id, recipeId);
-        setFavorites((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(recipeId);
-          return newSet;
-        });
-      } else {
-        await favoriteAPI.add({
-          user_id: user.user_id,
-          recipe_id: recipeId,
-        });
-        setFavorites((prev) => new Set(prev).add(recipeId));
-      }
-    } catch (error) {
-      console.error("Lỗi favorite:", error);
+const toggleFavorite = async (recipeId: number) => {
+  if (!user) return toast.error("Bạn cần đăng nhập để yêu thích!");
+
+  try {
+    if (favorites.has(recipeId)) {
+      await favoriteAPI.remove(user.user_id, recipeId);
+
+      setFavorites((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(recipeId);
+        return newSet;
+      });
+
+      toast.success("Đã xóa khỏi danh sách yêu thích 💔");
+    } else {
+      await favoriteAPI.add({
+        user_id: user.user_id,
+        recipe_id: recipeId,
+      });
+
+      setFavorites((prev) => new Set(prev).add(recipeId));
+
+      toast.success("Đã thêm vào danh sách yêu thích ❤️");
     }
-  };
+  } catch (error) {
+    console.error("Lỗi favorite:", error);
+    toast.error("Lỗi khi thay đổi trạng thái yêu thích!");
+  }
+};
+
 
   const clearFilters = () => {
     setSearchName("");
@@ -223,16 +224,13 @@ export const Search = () => {
         style={{ backgroundImage: `url(${BACKGROUND_IMG})` }}
       >
         <div className="max-w-7xl mx-auto px-4 py-8">
-
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-
             <div
-              className={`lg:col-span-1 relative ${showFilters ? "block" : "hidden lg:block"}`}
+              className={`lg:col-span-1 relative ${
+                showFilters ? "block" : "hidden lg:block"
+              }`}
             >
-
-              {/* 🔥 KHUNG BỘ LỌC — nổi trên ảnh nền */}
               <div className="relative z-10 bg-white/85 backdrop-blur-md shadow-lg rounded-xl p-6">
-
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-gray-900">Bộ lọc</h2>
 
@@ -254,7 +252,6 @@ export const Search = () => {
 
                 {/* 🔍 Tìm theo tên */}
                 <div className="space-y-6">
-
                   <div>
                     <label className="block text-sm font-semibold mb-3">
                       Tên món ăn
@@ -296,7 +293,9 @@ export const Search = () => {
                               key={cat.category_id}
                               className="cursor-pointer hover:bg-orange-100 px-2 py-1 rounded"
                               onClick={() => {
-                                if (!selectedCategories.includes(cat.category_id)) {
+                                if (
+                                  !selectedCategories.includes(cat.category_id)
+                                ) {
                                   setSelectedCategories([
                                     ...selectedCategories,
                                     cat.category_id,
@@ -309,7 +308,9 @@ export const Search = () => {
                             </div>
                           ))
                         ) : (
-                          <p className="text-xs text-gray-400 px-2">Không tìm thấy</p>
+                          <p className="text-xs text-gray-400 px-2">
+                            Không tìm thấy
+                          </p>
                         )}
                       </div>
                     )}
@@ -318,13 +319,17 @@ export const Search = () => {
                   {selectedCategories.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {selectedCategories.map((id) => {
-                        const cat = categories.find((c) => c.category_id === id);
+                        const cat = categories.find(
+                          (c) => c.category_id === id
+                        );
                         if (!cat) return null;
                         return (
                           <button
                             key={id}
                             onClick={() =>
-                              setSelectedCategories(selectedCategories.filter((c) => c !== id))
+                              setSelectedCategories(
+                                selectedCategories.filter((c) => c !== id)
+                              )
                             }
                             className={`px-4 py-2 rounded-full font-medium whitespace-nowrap transition-all bg-orange-500 text-white shadow-lg`}
                           >
@@ -334,8 +339,6 @@ export const Search = () => {
                       })}
                     </div>
                   )}
-
-
 
                   {/* 🧄 Nguyên liệu */}
                   <div>
@@ -348,7 +351,9 @@ export const Search = () => {
                       <input
                         type="text"
                         value={ingredientSearchTerm}
-                        onChange={(e) => setIngredientSearchTerm(e.target.value)}
+                        onChange={(e) =>
+                          setIngredientSearchTerm(e.target.value)
+                        }
                         placeholder="Tìm nguyên liệu..."
                         className="w-full pl-9 pr-4 py-2 border rounded-lg"
                       />
@@ -362,7 +367,11 @@ export const Search = () => {
                               key={ing.ingredient_id}
                               className="cursor-pointer hover:bg-orange-100 px-2 py-1 rounded"
                               onClick={() => {
-                                if (!selectedIngredients.includes(ing.ingredient_id)) {
+                                if (
+                                  !selectedIngredients.includes(
+                                    ing.ingredient_id
+                                  )
+                                ) {
                                   setSelectedIngredients([
                                     ...selectedIngredients,
                                     ing.ingredient_id,
@@ -375,7 +384,9 @@ export const Search = () => {
                             </div>
                           ))
                         ) : (
-                          <p className="text-xs text-gray-400 px-2">Không tìm thấy</p>
+                          <p className="text-xs text-gray-400 px-2">
+                            Không tìm thấy
+                          </p>
                         )}
                       </div>
                     )}
@@ -384,7 +395,9 @@ export const Search = () => {
                   {selectedIngredients.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
                       {selectedIngredients.map((id) => {
-                        const ing = ingredients.find((i) => i.ingredient_id === id);
+                        const ing = ingredients.find(
+                          (i) => i.ingredient_id === id
+                        );
                         if (!ing) return null;
                         return (
                           <span
@@ -408,7 +421,6 @@ export const Search = () => {
                     </div>
                   )}
 
-
                   {/* 🎚 Độ khó */}
                   <div>
                     <label className="block text-sm font-semibold mb-3">
@@ -425,7 +437,10 @@ export const Search = () => {
                             checked={selectedDifficulty.includes(level)}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedDifficulty([...selectedDifficulty, level]);
+                                setSelectedDifficulty([
+                                  ...selectedDifficulty,
+                                  level,
+                                ]);
                               } else {
                                 setSelectedDifficulty(
                                   selectedDifficulty.filter((d) => d !== level)
@@ -448,7 +463,7 @@ export const Search = () => {
 
                     <input
                       type="range"
-                      min="0"
+                      min="15"
                       max="240"
                       step="15"
                       value={maxCookingTime ?? 240}
@@ -469,10 +484,8 @@ export const Search = () => {
                     </p>
                   </div>
                 </div>
-
               </div>
             </div>
-
 
             {/* 🔥 KẾT QUẢ */}
             <div className="lg:col-span-3 bg-white/90 backdrop-blur-sm rounded-xl p-6 shadow-md">
@@ -497,9 +510,26 @@ export const Search = () => {
                           </div>
                         </Link>
 
-                        <div className="p-5">
+                        <div className="p-5 relative">
+                          {/* Nút trái tim yêu thích */}
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              toggleFavorite(recipe.recipe_id);
+                            }}
+                            className="absolute top-3 right-3 bg-white/80 backdrop-blur-sm rounded-full p-2 hover:scale-110 transition-transform shadow-sm"
+                          >
+                            <Heart
+                              className={`h-5 w-5 ${
+                                favorites.has(recipe.recipe_id)
+                                  ? "fill-red-500 text-red-500"
+                                  : "text-gray-400"
+                              }`}
+                            />
+                          </button>
+
                           <Link to={`/recipes/${recipe.recipe_id}`}>
-                            <h3 className="text-lg font-bold text-gray-900 mb-2">
+                            <h3 className="text-lg font-bold text-gray-900 mb-2 hover:text-orange-500">
                               {recipe.title}
                             </h3>
                           </Link>
@@ -540,7 +570,9 @@ export const Search = () => {
                 ) : (
                   <div className="bg-white rounded-xl shadow p-12 text-center">
                     <SearchIcon className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-                    <h3 className="text-xl font-bold">Không tìm thấy công thức</h3>
+                    <h3 className="text-xl font-bold">
+                      Không tìm thấy công thức
+                    </h3>
                     <p className="text-gray-600 mb-4">
                       Hãy thử thay đổi bộ lọc hoặc từ khoá tìm kiếm
                     </p>

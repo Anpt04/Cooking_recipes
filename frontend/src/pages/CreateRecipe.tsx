@@ -188,7 +188,7 @@ export default function CreateRecipe() {
         }
       }
 
-      toast.success("🎉 Tạo công thức thành công!");
+      toast.success("Tạo công thức thành công!");
       navigate(`/recipes/${recipeId}`);
     } catch (error) {
       console.error("❌ Error:", error);
@@ -530,7 +530,7 @@ export default function CreateRecipe() {
                         <div key={idx} className="relative group">
                           <img
                             src={URL.createObjectURL(img)}
-                            className="h-24 w-full object-cover rounded-lg border"
+                            className="h-full w-full object-cover rounded-lg border"
                           />
 
                           <button
