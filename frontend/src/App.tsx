@@ -17,6 +17,7 @@ import {Profile} from "./pages/Profile";
 import MealPlanDetail from "./pages/MealPlanDetail";
 import {Login} from "./pages/Login";
 import {Register} from "./pages/Register";
+import UploadProgress from "./pages/UploadProgress";
 
 import {AdminDashboard} from "./pages/admin/Dashboard";
 import {AdminCategories} from "./pages/admin/AdminCategories";
@@ -127,6 +128,7 @@ export default function App() {
         <Route path="/ingredients/request" element={<RequestIngredientForm />} />
         <Route path="/meal-plans" element={<MealPlans />} />
         <Route path="/meal-plans/:id" element={<MealPlanDetail />} />
+        <Route path="/upload-progress" element={<UploadProgress />} />
 
         {/* ADMIN ROUTES */}
         <Route

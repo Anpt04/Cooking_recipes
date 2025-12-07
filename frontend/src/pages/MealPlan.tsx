@@ -104,7 +104,7 @@ export default function MealPlans() {
 
             <div className="space-y-4">
               <input
-                placeholder="Tiêu đề kế hoạch (vd: Thực đơn tuần này)"
+                placeholder="Tiêu đề kế hoạch (vd: Thực đơn chay)"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-orange-500"
