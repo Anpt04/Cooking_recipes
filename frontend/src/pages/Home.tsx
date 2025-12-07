@@ -24,6 +24,7 @@ interface Recipe {
 
 export const Home = () => {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [recipes_category, setRecipesCategory] = useState<Recipe[]>([]);
   const [latestRecipes, setLatestRecipes] = useState<Recipe[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -38,15 +39,17 @@ export const Home = () => {
 
   const fetchData = async (p = 1) => {
     try {
-      const [recipesRes, categoriesData] = await Promise.all([
+      const [recipesRes, categoriesData, recipe_categoryData ] = await Promise.all([
         recipeAPI.getApproved(p),
         categoryAPI.getAll(),
+        recipeAPI.getAll(),
       ]);
 
       const recipeList = recipesRes.data || [];
       setRecipes(recipeList);
       setPage(recipesRes.page);
       setTotalPages(recipesRes.totalPages);
+      setRecipesCategory(recipe_categoryData.data || []);
 
       if (p === 1) {
         const sortedLatest = [...recipeList]
@@ -100,7 +103,7 @@ export const Home = () => {
   };
 
   const filteredRecipes = selectedCategory
-    ? recipes.filter((r) =>
+    ? recipes_category.filter((r) =>
         r.categories?.some((c) => c.category_id === selectedCategory)
       )
     : recipes;

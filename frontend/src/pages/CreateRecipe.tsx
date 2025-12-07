@@ -16,6 +16,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 import hbg from "../img/fav_head.jpg";
 import bg from "../img/home_background.jpeg";
+
 const BACKGROUND = bg;
 const H_BG = hbg;
 
@@ -56,7 +57,9 @@ export default function CreateRecipe() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
 
   const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
-  const [selectedIngredients, setSelectedIngredients] = useState<SelectedIngredient[]>([]);
+  const [selectedIngredients, setSelectedIngredients] = useState<
+    SelectedIngredient[]
+  >([]);
 
   const [categorySearch, setCategorySearch] = useState("");
   const [ingredientSearch, setIngredientSearch] = useState("");
@@ -88,10 +91,16 @@ export default function CreateRecipe() {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
+      if (
+        categoryRef.current &&
+        !categoryRef.current.contains(event.target as Node)
+      ) {
         setShowCategoryDropdown(false);
       }
-      if (ingredientRef.current && !ingredientRef.current.contains(event.target as Node)) {
+      if (
+        ingredientRef.current &&
+        !ingredientRef.current.contains(event.target as Node)
+      ) {
         setShowIngredientDropdown(false);
       }
     };
@@ -102,7 +111,7 @@ export default function CreateRecipe() {
   const fetchCategories = async () => {
     try {
       const res = await categoryAPI.getAll();
-      setCategories(res.data || []);
+      setCategories(res.data ?? []);
     } catch {
       setCategories([]);
     }
@@ -111,7 +120,7 @@ export default function CreateRecipe() {
   const fetchIngredients = async () => {
     try {
       const res = await ingredientAPI.getAll();
-      setIngredients(res.data || []);
+      setIngredients(res.data ?? []);
     } catch {
       setIngredients([]);
     }
@@ -124,21 +133,47 @@ export default function CreateRecipe() {
     }
   };
 
-  // HANDLE ING QUANTITY
   const handleQuantityChange = (id: number, value: string) => {
     setSelectedIngredients((prev) =>
-      prev.map((ing) => (ing.ingredient_id === id ? { ...ing, quantity: value } : ing))
+      prev.map((ing) =>
+        ing.ingredient_id === id ? { ...ing, quantity: value } : ing
+      )
     );
   };
 
-  // SUBMIT
+  // 🎯🎯🎯 UPLOAD NGẦM — gửi state sang trang process
+  const updateProgressPage = (
+    message: string,
+    progress: number,
+    recipeId?: number
+  ) => {
+    navigate("/upload-progress", {
+      state: {
+        message,
+        progress,
+        recipeId,
+      },
+    });
+  };
+
+  // SUBMIT FORM
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
     setLoading(true);
 
+    if (selectedIngredients.some(ing => !ing.quantity || ing.quantity.trim() === "")) {
+      toast.error("Vui lòng nhập đầy đủ số lượng cho tất cả nguyên liệu!");
+      setLoading(false);
+      return;
+    }
+
+
     try {
+      updateProgressPage("Đang tạo công thức...", 5);
+
+      // Tạo form data
       const data = new FormData();
       data.append("title", formData.title);
       data.append("description", formData.description);
@@ -146,28 +181,40 @@ export default function CreateRecipe() {
       data.append("servings", String(formData.servings));
       data.append("difficulty", formData.difficulty);
       data.append("user_id", String(user.user_id));
+
       if (mainImage) data.append("image", mainImage);
 
+      // 1️⃣ Tạo Recipe
       const res = await recipeAPI.create(data);
       const recipeId = res.data.recipe_id;
       if (!recipeId) throw new Error("Không thể tạo recipe.");
 
-      await Promise.all([
-        ...selectedCategories.map((cat) =>
+      updateProgressPage("Đang thêm danh mục...", 20);
+
+      // 2️⃣ Thêm Category
+      await Promise.all(
+        selectedCategories.map((cat) =>
           recipeCategoryAPI.add({
             recipe_id: recipeId,
             category_id: cat.category_id,
           })
-        ),
-        ...selectedIngredients.map((ing) =>
+        )
+      );
+
+      updateProgressPage("Đang thêm nguyên liệu...", 40);
+
+      // 3️⃣ Thêm Ingredient
+      await Promise.all(
+        selectedIngredients.map((ing) =>
           recipeIngredientAPI.add({
             recipe_id: recipeId,
             ingredient_id: ing.ingredient_id,
             quantity: ing.quantity || "",
           })
-        ),
-      ]);
+        )
+      );
 
+      // 4️⃣ Upload Step + Images
       for (let i = 0; i < steps.length; i++) {
         const step = steps[i];
 
@@ -178,18 +225,29 @@ export default function CreateRecipe() {
             instruction: step.instruction,
           });
 
-          for (const img of step.images) {
+          // Upload từng ảnh + update % progress nhỏ
+          for (let j = 0; j < step.images.length; j++) {
             const fd = new FormData();
             fd.append("recipe_id", String(recipeId));
             fd.append("step_id", String(createdStep.data.step_id));
-            fd.append("image", img);
+            fd.append("image", step.images[j]);
+
             await recipeImageAPI.add(fd);
+
+            const subProgress = 40 + ((i * 100) / steps.length) * 0.4;
+            updateProgressPage(
+              "Đang tải ảnh bước...",
+              Math.min(90, subProgress)
+            );
           }
         }
       }
 
-      toast.success("Tạo công thức thành công!");
-      navigate(`/recipes/${recipeId}`);
+      updateProgressPage("Hoàn tất!", 100, recipeId);
+
+      setTimeout(() => {
+        navigate(`/recipes/${recipeId}`);
+      }, 1000);
     } catch (error) {
       console.error("❌ Error:", error);
       toast.error("Tạo công thức thất bại!");
@@ -203,10 +261,8 @@ export default function CreateRecipe() {
       className="min-h-screen bg-cover bg-center bg-fixed"
       style={{ backgroundImage: `url(${BACKGROUND})` }}
     >
-      {/* Lớp mờ */}
       <div className="min-h-screen bg-white/70 backdrop-blur-sm">
-
-        {/* HEADER ẢNH */}
+        {/* HEADER */}
         <div
           className="relative h-56 bg-cover bg-center shadow-lg rounded-b-3xl"
           style={{ backgroundImage: `url(${H_BG})` }}
@@ -223,12 +279,10 @@ export default function CreateRecipe() {
           </div>
         </div>
 
-        {/* CONTENT FORM */}
+        {/* FORM */}
         <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-8 border border-gray-100 mt-10 mb-10">
-
           <form onSubmit={handleSubmit} className="space-y-6">
-
-            {/* TÊN MÓN ĂN */}
+            {/* TÊN MÓN */}
             <div>
               <label className="block mb-2 font-semibold">Tên món ăn</label>
               <input
@@ -266,7 +320,10 @@ export default function CreateRecipe() {
                   min={0}
                   value={formData.cooking_time}
                   onChange={(e) =>
-                    setFormData({ ...formData, cooking_time: Number(e.target.value) })
+                    setFormData({
+                      ...formData,
+                      cooking_time: Number(e.target.value),
+                    })
                   }
                   className="w-full border rounded-lg px-4 py-3"
                 />
@@ -279,7 +336,10 @@ export default function CreateRecipe() {
                   min={1}
                   value={formData.servings}
                   onChange={(e) =>
-                    setFormData({ ...formData, servings: Number(e.target.value) })
+                    setFormData({
+                      ...formData,
+                      servings: Number(e.target.value),
+                    })
                   }
                   className="w-full border rounded-lg px-4 py-3"
                 />
@@ -309,7 +369,9 @@ export default function CreateRecipe() {
                 placeholder="Tìm danh mục..."
                 value={categorySearch}
                 onFocus={() => setShowCategoryDropdown(true)}
-                onChange={(e) => setCategorySearch(e.target.value.toLowerCase())}
+                onChange={(e) =>
+                  setCategorySearch(e.target.value.toLowerCase())
+                }
                 className="w-full border rounded-lg px-4 py-3"
               />
 
@@ -371,7 +433,9 @@ export default function CreateRecipe() {
                 placeholder="Tìm nguyên liệu..."
                 value={ingredientSearch}
                 onFocus={() => setShowIngredientDropdown(true)}
-                onChange={(e) => setIngredientSearch(e.target.value.toLowerCase())}
+                onChange={(e) =>
+                  setIngredientSearch(e.target.value.toLowerCase())
+                }
                 className="w-full border rounded-lg px-4 py-3"
               />
 
@@ -392,7 +456,10 @@ export default function CreateRecipe() {
                           ) {
                             setSelectedIngredients([
                               ...selectedIngredients,
-                              { ingredient_id: ing.ingredient_id, quantity: "" },
+                              {
+                                ingredient_id: ing.ingredient_id,
+                                quantity: "",
+                              },
                             ]);
                           }
                           setShowIngredientDropdown(false);
@@ -423,7 +490,10 @@ export default function CreateRecipe() {
                           placeholder="Số lượng"
                           value={sel.quantity}
                           onChange={(e) =>
-                            handleQuantityChange(sel.ingredient_id, e.target.value)
+                            handleQuantityChange(
+                              sel.ingredient_id,
+                              e.target.value
+                            )
                           }
                           className="border rounded px-2 py-1 text-sm w-28"
                         />
@@ -435,7 +505,9 @@ export default function CreateRecipe() {
                           type="button"
                           onClick={() =>
                             setSelectedIngredients((prev) =>
-                              prev.filter((i) => i.ingredient_id !== sel.ingredient_id)
+                              prev.filter(
+                                (i) => i.ingredient_id !== sel.ingredient_id
+                              )
                             )
                           }
                           className="text-red-500"
@@ -477,14 +549,19 @@ export default function CreateRecipe() {
               <h2 className="font-semibold text-lg mb-3">Các bước nấu</h2>
 
               {steps.map((step, i) => (
-                <div key={i} className="border rounded-xl p-4 mb-4 bg-white shadow-sm">
+                <div
+                  key={i}
+                  className="border rounded-xl p-4 mb-4 bg-white shadow-sm"
+                >
                   <div className="flex justify-between mb-2">
                     <h3 className="font-semibold">Bước {i + 1}</h3>
 
                     {steps.length > 1 && (
                       <button
                         type="button"
-                        onClick={() => setSteps(steps.filter((_, idx) => idx !== i))}
+                        onClick={() =>
+                          setSteps(steps.filter((_, idx) => idx !== i))
+                        }
                         className="text-red-500"
                       >
                         <Trash2 className="h-5 w-5" />
@@ -537,7 +614,9 @@ export default function CreateRecipe() {
                             type="button"
                             onClick={() => {
                               const arr = [...steps];
-                              arr[i].images = arr[i].images.filter((_, x) => x !== idx);
+                              arr[i].images = arr[i].images.filter(
+                                (_, x) => x !== idx
+                              );
                               setSteps(arr);
                             }}
                             className="absolute top-1 right-1 bg-black/60 text-white rounded-full px-1 opacity-0 group-hover:opacity-100 transition"
@@ -553,7 +632,9 @@ export default function CreateRecipe() {
 
               <button
                 type="button"
-                onClick={() => setSteps([...steps, { instruction: "", images: [] }])}
+                onClick={() =>
+                  setSteps([...steps, { instruction: "", images: [] }])
+                }
                 className="flex items-center text-orange-600 hover:text-orange-700"
               >
                 <Plus className="h-4 w-4" />
@@ -561,7 +642,7 @@ export default function CreateRecipe() {
               </button>
             </div>
 
-            {/* BUTTONS */}
+            {/* NÚT SUBMIT */}
             <div className="flex justify-end space-x-4 pt-6">
               <button
                 type="button"
@@ -580,7 +661,6 @@ export default function CreateRecipe() {
                 {loading ? "Đang xử lý..." : "Tạo mới"}
               </button>
             </div>
-
           </form>
         </div>
       </div>

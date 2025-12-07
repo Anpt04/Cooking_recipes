@@ -8,6 +8,7 @@ import {
   rateAPI,
   rateReportAPI,
 } from "../services/api";
+import { toastConfirm } from "../components/toastConfirm";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 import bg from "../img/home_background.jpeg";
@@ -113,17 +114,19 @@ const toggleFavorite = async () => {
 };
 
 
-  const handleDelete = async () => {
-    if (!window.confirm("Bạn chắc chắn muốn xóa?")) return;
+const handleDelete = async () => {
+  const confirmed = await toastConfirm("Bạn chắc chắn muốn xóa công thức này?");
 
-    try {
-      await recipeAPI.delete(Number(id));
-      toast.success("Đã xóa công thức");
-      navigate("/");
-    } catch {
-      toast.error("Không thể xóa");
-    }
-  };
+  if (!confirmed) return;
+
+  try {
+    await recipeAPI.delete(Number(id));
+    toast.success("Đã xóa công thức");
+    navigate("/");
+  } catch {
+    toast.error("Không thể xóa");
+  }
+};
 
   const submitRecipeReport = async () => {
     if (!reportReasonRecipe.trim()) {
